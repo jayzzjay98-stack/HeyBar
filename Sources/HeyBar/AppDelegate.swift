@@ -6,6 +6,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         static let environmentKey = "HEYBAR_SETTINGS_HELPER"
         static let pidDefaultsKey = "heybar.settingsHelperPID"
         static let showNotificationName = Notification.Name("com.gravity.heybar.settingsHelper.show")
+        /// Passed as a launch argument so the helper starts without showing a window.
+        static let standbyArgument = "--settings-standby"
     }
 
     private let model = AppModel()
@@ -13,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindowController: SettingsWindowController?
     private var onboardingWindowController: OnboardingWindowController?
     private var settingsHelperObserver: NSObjectProtocol?
+    private var mainAppTerminationObserver: NSObjectProtocol?
     private let isSettingsHelper =
         ProcessInfo.processInfo.environment[SettingsHelperState.environmentKey] == "1"
         || ProcessInfo.processInfo.arguments.contains("--settings-helper")
@@ -22,11 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let environment = ProcessInfo.processInfo.environment
         if isSettingsHelper {
+            let isStandby = ProcessInfo.processInfo.arguments.contains(SettingsHelperState.standbyArgument)
             UserDefaults.standard.set(ProcessInfo.processInfo.processIdentifier, forKey: SettingsHelperState.pidDefaultsKey)
-            // showSettingsWindow() owns the full window lifecycle (create → present → onClose).
-            // Do NOT pre-create settingsWindowController here: showSettingsWindow() calls .close()
-            // on any existing controller first, which would fire onWindowClose → NSApp.terminate
-            // before the window ever appears.
+
+            // Listen for the main app to ask us to show the settings window.
             settingsHelperObserver = DistributedNotificationCenter.default().addObserver(
                 forName: SettingsHelperState.showNotificationName,
                 object: Bundle.main.bundleIdentifier,
@@ -36,7 +38,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.showSettingsWindow()
                 }
             }
-            showSettingsWindow()
+
+            // Terminate when the main app process exits (covers crashes too).
+            let mainPID = NSWorkspace.shared.runningApplications
+                .first(where: {
+                    $0.bundleIdentifier == Bundle.main.bundleIdentifier &&
+                    $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
+                })?.processIdentifier
+            if let mainPID {
+                mainAppTerminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                    forName: NSWorkspace.didTerminateApplicationNotification,
+                    object: nil,
+                    queue: .main
+                ) { notification in
+                    guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                          app.processIdentifier == mainPID else { return }
+                    Task { @MainActor in NSApp.terminate(nil) }
+                }
+            }
+
+            if !isStandby {
+                showSettingsWindow()
+            }
             return
         }
 
@@ -48,6 +71,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.showSettings()
         })
         statusBarController?.setVisible(true)
+
+        // Pre-warm the settings helper so the first open is instant.
+        prewarmSettingsHelper()
 
         if !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
             showOnboarding()
@@ -80,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DistributedNotificationCenter.default().removeObserver(settingsHelperObserver)
             self.settingsHelperObserver = nil
         }
+        if let mainAppTerminationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(mainAppTerminationObserver)
+            self.mainAppTerminationObserver = nil
+        }
         if isSettingsHelper {
             let currentPID = Int(ProcessInfo.processInfo.processIdentifier)
             if UserDefaults.standard.integer(forKey: SettingsHelperState.pidDefaultsKey) == currentPID {
@@ -89,62 +119,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusBarController?.invalidate()
     }
 
+    // MARK: - Settings (main process)
+
     private func showSettings() {
-        if activateExistingSettingsHelper() {
-            return
-        }
-        launchSettingsHelper()
-    }
-
-    private func showSettingsWindow() {
-        // Clear onWindowClose BEFORE closing: otherwise the existing handler
-        // ({ NSApp.terminate }) fires during .close(), killing the helper
-        // before the new window is ever shown.
-        settingsWindowController?.onWindowClose = nil
-        settingsWindowController?.close()
-        settingsWindowController = nil
-
-        let controller = SettingsWindowController(model: model)
-        controller.onWindowClose = { [weak self] in
-            self?.settingsWindowController = nil
-            NSApp.terminate(nil)
-        }
-        settingsWindowController = controller
-        controller.present()
-        NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
-    }
-
-    private func activateExistingSettingsHelper() -> Bool {
         let pid = UserDefaults.standard.integer(forKey: SettingsHelperState.pidDefaultsKey)
-        guard pid > 0, pid != ProcessInfo.processInfo.processIdentifier,
-              NSRunningApplication(processIdentifier: pid_t(pid)) != nil else {
-            UserDefaults.standard.removeObject(forKey: SettingsHelperState.pidDefaultsKey)
-            return false
+        let helperAlive = pid > 0
+            && pid != Int(ProcessInfo.processInfo.processIdentifier)
+            && NSRunningApplication(processIdentifier: pid_t(pid)) != nil
+        if helperAlive {
+            DistributedNotificationCenter.default().postNotificationName(
+                SettingsHelperState.showNotificationName,
+                object: Bundle.main.bundleIdentifier,
+                userInfo: nil,
+                deliverImmediately: true
+            )
+        } else {
+            // Helper not ready yet (e.g. clicked before pre-warm finished) — launch directly.
+            launchSettingsHelper(standby: false)
         }
-        DistributedNotificationCenter.default().postNotificationName(
-            SettingsHelperState.showNotificationName,
-            object: Bundle.main.bundleIdentifier,
-            userInfo: nil,
-            deliverImmediately: true
-        )
-        return true
     }
 
-    private func launchSettingsHelper() {
+    /// Launch the helper process ahead of time so the first Settings open is instant.
+    private func prewarmSettingsHelper() {
+        launchSettingsHelper(standby: true)
+    }
+
+    private func launchSettingsHelper(standby: Bool) {
         guard let executableURL = Bundle.main.executableURL else { return }
         let process = Process()
         process.executableURL = executableURL
         process.qualityOfService = .userInteractive
-        var environment = ProcessInfo.processInfo.environment
-        environment[SettingsHelperState.environmentKey] = "1"
-        process.environment = environment
-        process.arguments = ["--settings-helper"]
+        var env = ProcessInfo.processInfo.environment
+        env[SettingsHelperState.environmentKey] = "1"
+        process.environment = env
+        process.arguments = standby
+            ? ["--settings-helper", SettingsHelperState.standbyArgument]
+            : ["--settings-helper"]
         do {
             try process.run()
         } catch {
             HeyBarDiagnostics.error(HeyBarLog.app, "Failed to launch settings helper: \(error.localizedDescription)")
         }
     }
+
+    // MARK: - Settings (helper process)
+
+    private func showSettingsWindow() {
+        // Tear down any existing window first.
+        settingsWindowController?.onWindowClose = nil
+        settingsWindowController?.close()
+        settingsWindowController = nil
+
+        let controller = SettingsWindowController(model: model)
+        // On close: stay alive (don't terminate) so the next open is instant.
+        controller.onWindowClose = { [weak self] in
+            self?.settingsWindowController = nil
+        }
+        settingsWindowController = controller
+        controller.present()
+        NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+    }
+
+    // MARK: - Onboarding
 
     private func showOnboarding() {
         onboardingWindowController = OnboardingWindowController { [weak self] in
