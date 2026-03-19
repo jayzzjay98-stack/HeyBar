@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 @MainActor
 final class QuickControlsViewController: NSViewController {
@@ -18,6 +19,7 @@ final class QuickControlsViewController: NSViewController {
 
     // Countdown refresh timer (runs while panel is visible)
     private var displayTimer: Timer?
+    private var themeCancellable: AnyCancellable?
 
     private let keepAwakeButton = FeatureTileButton(
         title: "Keep Awake",
@@ -64,6 +66,10 @@ final class QuickControlsViewController: NSViewController {
         self.model = model
         self.openSettings = openSettings
         super.init(nibName: nil, bundle: nil)
+        themeCancellable = model.$selectedThemeID
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refresh() }
     }
 
     @available(*, unavailable)
