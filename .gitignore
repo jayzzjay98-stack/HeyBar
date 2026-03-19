@@ -1,0 +1,14 @@
+.DS_Store
+/.build
+/Packages
+/dist
+/.claude
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+/dist
+/docs
+/prd
+appcast.xml
