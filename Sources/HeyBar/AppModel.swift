@@ -7,6 +7,13 @@ final class AppModel: ObservableObject {
         didSet {
             guard oldValue != selectedThemeID else { return }
             UserDefaults.standard.set(selectedThemeID, forKey: ThemeCatalog.storageKey)
+            // Broadcast to other processes (e.g. main app ← settings helper)
+            DistributedNotificationCenter.default().postNotificationName(
+                AppModel.themeDidChangeNotification,
+                object: Bundle.main.bundleIdentifier,
+                userInfo: nil,
+                deliverImmediately: true
+            )
         }
     }
     lazy var updater = InAppUpdater()
@@ -27,18 +34,18 @@ final class AppModel: ObservableObject {
 
     var onQuit: (() -> Void)?
 
-    // Observes UserDefaults so theme changes made by the Settings helper
-    // process are picked up immediately in the main (status-bar) process.
-    nonisolated(unsafe) private var defaultsObserver: NSObjectProtocol?
+    static let themeDidChangeNotification = Notification.Name("com.gravity.heybar.themeDidChange")
+
+    nonisolated(unsafe) private var themeObserver: NSObjectProtocol?
 
     init() {
         selectedThemeID = ThemeCatalog.persistedThemeID() ?? ThemeCatalog.fallbackTheme.id
-        defaultsObserver = NotificationCenter.default.addObserver(
-            forName: UserDefaults.didChangeNotification,
-            object: UserDefaults.standard,
+        // Listen for theme changes posted by the Settings helper process.
+        themeObserver = DistributedNotificationCenter.default().addObserver(
+            forName: AppModel.themeDidChangeNotification,
+            object: Bundle.main.bundleIdentifier,
             queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
             let persisted = ThemeCatalog.persistedThemeID() ?? ThemeCatalog.fallbackTheme.id
             Task { @MainActor [weak self] in
                 guard let self, persisted != self.selectedThemeID else { return }
@@ -48,7 +55,7 @@ final class AppModel: ObservableObject {
     }
 
     deinit {
-        defaultsObserver.map { NotificationCenter.default.removeObserver($0) }
+        themeObserver.map { DistributedNotificationCenter.default().removeObserver($0) }
     }
 
     var selectedTheme: AppTheme {
