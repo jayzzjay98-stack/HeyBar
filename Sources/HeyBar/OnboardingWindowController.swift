@@ -4,6 +4,12 @@ import SwiftUI
 
 // MARK: - Window Controller
 
+private enum OnboardingLayout {
+    static let windowSize = NSSize(width: 560, height: 440)
+    static let stepTransitionDuration: TimeInterval = 0.22
+    static let buttonPressDuration: TimeInterval = 0.1
+}
+
 @MainActor
 final class OnboardingWindowController: NSWindowController {
     private var hostingController: NSHostingController<OnboardingView>?
@@ -13,7 +19,7 @@ final class OnboardingWindowController: NSWindowController {
         self.onComplete = onComplete
 
         let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: NSSize(width: 560, height: 440)),
+            contentRect: NSRect(origin: .zero, size: OnboardingLayout.windowSize),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -47,6 +53,7 @@ final class OnboardingWindowController: NSWindowController {
 private struct OnboardingView: View {
     let onComplete: () -> Void
     @State private var step = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -73,11 +80,11 @@ private struct OnboardingView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.asymmetric(
+                .transition(reduceMotion ? .opacity : .asymmetric(
                     insertion: .move(edge: .trailing).combined(with: .opacity),
                     removal: .move(edge: .leading).combined(with: .opacity)
                 ))
-                .animation(.easeOut(duration: 0.22), value: step)
+                .animation(reduceMotion ? .none : .easeOut(duration: OnboardingLayout.stepTransitionDuration), value: step)
 
                 navigationBar
                     .padding(.horizontal, 40)
@@ -85,7 +92,7 @@ private struct OnboardingView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .frame(width: 560, height: 440)
+        .frame(width: OnboardingLayout.windowSize.width, height: OnboardingLayout.windowSize.height)
     }
 
     // MARK: Step Indicator
@@ -96,7 +103,7 @@ private struct OnboardingView: View {
                 Capsule()
                     .fill(i == step ? Color.white : Color.white.opacity(0.18))
                     .frame(width: i == step ? 22 : 6, height: 6)
-                    .animation(.easeOut(duration: 0.22), value: step)
+                    .animation(reduceMotion ? .none : .easeOut(duration: OnboardingLayout.stepTransitionDuration), value: step)
             }
         }
     }
@@ -253,7 +260,7 @@ private struct OnboardingView: View {
         HStack {
             if step > 0 {
                 Button("Back") {
-                    withAnimation { step -= 1 }
+                    withAnimation(reduceMotion ? nil : .default) { step -= 1 }
                 }
                 .buttonStyle(OnboardingSecondaryButtonStyle())
             }
@@ -262,7 +269,7 @@ private struct OnboardingView: View {
 
             if step < 2 {
                 Button(step == 1 ? "Continue" : "Get Started") {
-                    withAnimation { step += 1 }
+                    withAnimation(reduceMotion ? nil : .default) { step += 1 }
                 }
                 .buttonStyle(OnboardingPrimaryButtonStyle())
             } else {
@@ -279,6 +286,8 @@ private struct OnboardingView: View {
 // MARK: - Button Styles
 
 private struct OnboardingPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -296,24 +305,28 @@ private struct OnboardingPrimaryButtonStyle: ButtonStyle {
                 )
             )
             .clipShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
+            .animation(reduceMotion ? .none : .easeOut(duration: OnboardingLayout.buttonPressDuration), value: configuration.isPressed)
     }
 }
 
 private struct OnboardingSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 14, weight: .medium, design: .rounded))
             .foregroundStyle(.white.opacity(0.5))
             .padding(.horizontal, 16)
             .padding(.vertical, 11)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.97 : 1))
+            .animation(reduceMotion ? .none : .easeOut(duration: OnboardingLayout.buttonPressDuration), value: configuration.isPressed)
     }
 }
 
 private struct OnboardingPillButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 12, weight: .semibold))
@@ -325,7 +338,7 @@ private struct OnboardingPillButtonStyle: ButtonStyle {
             .overlay(
                 Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1)
             )
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.96 : 1))
+            .animation(reduceMotion ? .none : .easeOut(duration: OnboardingLayout.buttonPressDuration), value: configuration.isPressed)
     }
 }

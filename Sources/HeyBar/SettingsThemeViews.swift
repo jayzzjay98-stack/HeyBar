@@ -19,7 +19,7 @@ struct SettingsWindowBackground: View {
                 ],
                 center: .topLeading,
                 startRadius: 20,
-                endRadius: 260
+                endRadius: SettingsLayout.backgroundTintOrbRadius
             )
 
             RadialGradient(
@@ -29,7 +29,7 @@ struct SettingsWindowBackground: View {
                 ],
                 center: .bottomTrailing,
                 startRadius: 40,
-                endRadius: 240
+                endRadius: SettingsLayout.backgroundCloseOrbRadius
             )
         }
     }
@@ -186,6 +186,9 @@ struct SettingsSidebarButton: View {
         .buttonStyle(.plain)
         .keyboardShortcut(KeyEquivalent(Character(page.commandShortcut)), modifiers: [.command])
         .help("Switch to \(page.rawValue) (\u{2318}\(page.commandShortcut))")
+        .accessibilityLabel(page.rawValue)
+        .accessibilityHint("Switch to \(page.rawValue) settings")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .onHover { hovered in
             isHovered = hovered
         }
@@ -813,6 +816,9 @@ struct ThemePreviewCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(theme.name)
+        .accessibilityHint(isSelected ? "Current theme" : "Apply \(theme.name) theme")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .onHover { hovered in
             isHovered = hovered
         }

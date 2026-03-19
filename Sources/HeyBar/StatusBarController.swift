@@ -40,6 +40,10 @@ final class StatusBarController {
         quickPanel.toggle(relativeTo: button)
     }
 
+    func setVisible(_ visible: Bool) {
+        mainItem.isVisible = visible
+    }
+
     func setHiddenMode(_ enabled: Bool) {
         isHidden = enabled
         mainItem.length = enabled ? 10_000 : NSStatusItem.variableLength

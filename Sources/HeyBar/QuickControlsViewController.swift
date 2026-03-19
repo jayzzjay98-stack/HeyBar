@@ -79,6 +79,36 @@ final class QuickControlsViewController: NSViewController {
         backgroundView.translatesAutoresizingMaskIntoConstraints = false
         backgroundView.wantsLayer = true
 
+        setupCloseButton()
+        configureTileActions()
+        setupFooterButtons()
+        setupToastView()
+
+        let tileRow1 = makeTileRow([keepAwakeButton, hiddenFilesButton])
+        let tileRow2 = makeTileRow([fileExtensionsButton, keyLightButton])
+        let tileRow3 = makeTileRow([nightShiftButton, hideDockButton])
+        let tileRow4 = makeTileRow([hideBarButton, cleanKeyButton])
+        let tileRows = [tileRow1, tileRow2, tileRow3, tileRow4]
+
+        let topBar = makeTopBar()
+        let footerBar = makeFooterBar()
+        let contentStack = makeContentStack(topBar: topBar, tileRows: tileRows, footerBar: footerBar)
+
+        backgroundView.addSubview(contentStack)
+        view.addSubview(backgroundView)
+        view.addSubview(toastView)
+
+        activateLayoutConstraints(
+            contentStack: contentStack,
+            topBar: topBar,
+            footerBar: footerBar,
+            tileRows: tileRows
+        )
+
+        refresh()
+    }
+
+    private func setupCloseButton() {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         closeButton.bezelStyle = .regularSquare
         closeButton.isBordered = false
@@ -87,17 +117,11 @@ final class QuickControlsViewController: NSViewController {
         closeButton.action = #selector(closePanel)
         closeButton.wantsLayer = true
         closeButton.layer?.cornerRadius = 13
-
         closeButton.widthAnchor.constraint(equalToConstant: QuickControlsLayout.closeButtonSize).isActive = true
         closeButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.closeButtonSize).isActive = true
+    }
 
-        configureTileActions()
-
-        let tileRow1 = makeTileRow([keepAwakeButton, hiddenFilesButton])
-        let tileRow2 = makeTileRow([fileExtensionsButton, keyLightButton])
-        let tileRow3 = makeTileRow([nightShiftButton, hideDockButton])
-        let tileRow4 = makeTileRow([hideBarButton, cleanKeyButton])
-
+    private func setupFooterButtons() {
         settingsButton.translatesAutoresizingMaskIntoConstraints = false
         settingsButton.isBordered = false
         settingsButton.wantsLayer = true
@@ -117,26 +141,9 @@ final class QuickControlsViewController: NSViewController {
         quitButton.alignment = .center
         quitButton.target = self
         quitButton.action = #selector(quitApp)
+    }
 
-        let topBar = NSStackView(views: [NSView(), closeButton])
-        topBar.translatesAutoresizingMaskIntoConstraints = false
-        topBar.orientation = .horizontal
-        topBar.alignment = .centerY
-        topBar.spacing = 8
-
-        let footerBar = NSStackView(views: [quitButton, NSView(), settingsButton])
-        footerBar.translatesAutoresizingMaskIntoConstraints = false
-        footerBar.orientation = .horizontal
-        footerBar.alignment = .centerY
-        footerBar.spacing = 10
-
-        let contentStack = NSStackView(views: [topBar, tileRow1, tileRow2, tileRow3, tileRow4, footerBar])
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        contentStack.orientation = .vertical
-        contentStack.alignment = .leading
-        contentStack.spacing = QuickControlsLayout.stackSpacing
-
-        // Toast notification overlay
+    private func setupToastView() {
         toastView.translatesAutoresizingMaskIntoConstraints = false
         toastView.wantsLayer = true
         toastView.layer?.cornerRadius = 14
@@ -148,12 +155,42 @@ final class QuickControlsViewController: NSViewController {
         toastLabel.textColor = .white
         toastLabel.alignment = .center
         toastView.addSubview(toastLabel)
+    }
 
-        backgroundView.addSubview(contentStack)
-        view.addSubview(backgroundView)
-        view.addSubview(toastView)
+    private func makeTopBar() -> NSStackView {
+        let bar = NSStackView(views: [NSView(), closeButton])
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        bar.orientation = .horizontal
+        bar.alignment = .centerY
+        bar.spacing = 8
+        return bar
+    }
 
-        NSLayoutConstraint.activate([
+    private func makeFooterBar() -> NSStackView {
+        let bar = NSStackView(views: [quitButton, NSView(), settingsButton])
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        bar.orientation = .horizontal
+        bar.alignment = .centerY
+        bar.spacing = 10
+        return bar
+    }
+
+    private func makeContentStack(topBar: NSStackView, tileRows: [NSStackView], footerBar: NSStackView) -> NSStackView {
+        let stack = NSStackView(views: [topBar] + tileRows + [footerBar])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = QuickControlsLayout.stackSpacing
+        return stack
+    }
+
+    private func activateLayoutConstraints(
+        contentStack: NSStackView,
+        topBar: NSStackView,
+        footerBar: NSStackView,
+        tileRows: [NSStackView]
+    ) {
+        var constraints: [NSLayoutConstraint] = [
             backgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -164,23 +201,12 @@ final class QuickControlsViewController: NSViewController {
             contentStack.topAnchor.constraint(equalTo: backgroundView.topAnchor, constant: QuickControlsLayout.panelInset),
             contentStack.bottomAnchor.constraint(equalTo: backgroundView.bottomAnchor, constant: -QuickControlsLayout.panelInset),
 
-            tileRow1.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
-            tileRow2.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
-            tileRow3.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
-            tileRow4.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
             topBar.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
             footerBar.widthAnchor.constraint(equalTo: contentStack.widthAnchor),
-            keepAwakeButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight),
-            hiddenFilesButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight),
-            fileExtensionsButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight),
-            keyLightButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight),
-            nightShiftButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight),
-            hideDockButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight),
-            hideBarButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight),
-            cleanKeyButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight),
-            quitButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 96),
+
+            quitButton.widthAnchor.constraint(greaterThanOrEqualToConstant: QuickControlsLayout.quitButtonMinWidth),
             quitButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.footerButtonHeight),
-            settingsButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 112),
+            settingsButton.widthAnchor.constraint(greaterThanOrEqualToConstant: QuickControlsLayout.settingsButtonMinWidth),
             settingsButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.footerButtonHeight),
 
             toastLabel.leadingAnchor.constraint(equalTo: toastView.leadingAnchor, constant: 16),
@@ -188,10 +214,16 @@ final class QuickControlsViewController: NSViewController {
             toastLabel.centerYAnchor.constraint(equalTo: toastView.centerYAnchor),
             toastView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             toastView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16),
-            toastView.heightAnchor.constraint(equalToConstant: 30)
-        ])
+            toastView.heightAnchor.constraint(equalToConstant: 30),
+        ]
 
-        refresh()
+        let allTileButtons = [keepAwakeButton, hiddenFilesButton, fileExtensionsButton,
+                              keyLightButton, nightShiftButton, hideDockButton,
+                              hideBarButton, cleanKeyButton]
+        constraints += tileRows.map { $0.widthAnchor.constraint(equalTo: contentStack.widthAnchor) }
+        constraints += allTileButtons.map { $0.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight) }
+
+        NSLayoutConstraint.activate(constraints)
     }
 
     override func viewWillAppear() {
@@ -284,6 +316,10 @@ final class QuickControlsViewController: NSViewController {
             captionOverride: shortcutLabel(for: .cleanKey) ?? "Cleaning"
         )
 
+        updateTooltips()
+    }
+
+    private func updateTooltips() {
         keyLightButton.toolTip = model.keyLight.isSupported
             ? "Toggle keyboard backlight"
             : "Key Light is unavailable on this Mac"
@@ -301,7 +337,6 @@ final class QuickControlsViewController: NSViewController {
             : "Start CleanKey mode"
         quitButton.toolTip = "Quit HeyBar"
         settingsButton.toolTip = "Open Settings"
-
     }
 
     private func keepAwakeCountdownText() -> String? {
@@ -401,13 +436,13 @@ final class QuickControlsViewController: NSViewController {
         toastView.layer?.removeAllAnimations()
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
+            ctx.duration = QuickControlsLayout.toastFadeInDuration
             toastView.animator().alphaValue = 1
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { [weak self] in
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.28
+                ctx.duration = QuickControlsLayout.toastFadeOutDuration
                 self?.toastView.animator().alphaValue = 0
             }
         }
@@ -421,8 +456,8 @@ final class QuickControlsViewController: NSViewController {
     }
 
     @objc private func openSettingsAction() {
-        onClose?()
         openSettings()
+        onClose?()
     }
 
     @objc private func quitApp() {
