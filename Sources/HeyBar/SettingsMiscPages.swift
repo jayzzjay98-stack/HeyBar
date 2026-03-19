@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import ServiceManagement
 
 private enum AppInfo {
     static let version: String = {
@@ -12,8 +14,57 @@ private enum AppInfo {
     static let versionDetail = "Version \(version)"
 }
 
+// MARK: - Preferences Page
+
+struct PreferencesSettingsPage: View {
+    @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLoginError: String?
+
+    var body: some View {
+        SettingsPageScroll {
+            SettingsPageHeader(page: .preferences, statusText: launchAtLogin ? "Enabled" : "Disabled")
+
+            // MARK: Launch at Login
+            SettingsSectionCard(
+                title: "Launch at Login",
+                subtitle: "Make HeyBar available as soon as your Mac session starts.",
+                statusText: launchAtLogin ? "Enabled" : "Disabled",
+                tone: launchAtLogin ? .positive : .neutral,
+                iconName: "power.circle"
+            ) {
+                Toggle(isOn: Binding(
+                    get: { launchAtLogin },
+                    set: { applyLaunchAtLogin($0) }
+                )) {
+                    Label("Launch at Login", systemImage: "power.circle")
+                }
+                .toggleStyle(.switch)
+
+                if let error = launchAtLoginError {
+                    SettingsInlineMessage(text: error, isError: true)
+                }
+            }
+        }
+        .navigationTitle("Preferences")
+    }
+
+    private func applyLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled { try SMAppService.mainApp.register() }
+            else       { try SMAppService.mainApp.unregister() }
+            launchAtLogin = enabled
+            launchAtLoginError = nil
+        } catch {
+            launchAtLoginError = "Could not \(enabled ? "enable" : "disable") Launch at Login. \(error.localizedDescription)"
+        }
+    }
+}
+
+// MARK: - Themes Page
+
 struct ThemesSettingsPage: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns = [
         GridItem(.adaptive(minimum: SettingsLayout.themeGridMinimum, maximum: SettingsLayout.themeGridMaximum), spacing: SettingsLayout.detailPadding)
@@ -32,7 +83,7 @@ struct ThemesSettingsPage: View {
                         theme: theme,
                         isSelected: model.selectedThemeID == theme.id
                     ) {
-                        withAnimation(.easeInOut(duration: 0.16)) {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: SettingsLayout.themeChangeDuration)) {
                             model.selectedThemeID = theme.id
                         }
                     }

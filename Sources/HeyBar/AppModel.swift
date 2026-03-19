@@ -8,7 +8,7 @@ final class AppModel: ObservableObject {
             UserDefaults.standard.set(selectedThemeID, forKey: ThemeCatalog.storageKey)
         }
     }
-    let updater = InAppUpdater()
+    lazy var updater = InAppUpdater()
     let keepAwake = KeepAwakeController()
     let hiddenFiles = HiddenFilesController()
     let fileExtensions = ShowFileExtensionsController()

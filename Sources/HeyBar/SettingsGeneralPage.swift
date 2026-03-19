@@ -1,5 +1,4 @@
 import SwiftUI
-import ServiceManagement
 
 // MARK: - Feature List
 
@@ -12,7 +11,6 @@ private enum CustomizeFeature: String, CaseIterable, Identifiable {
     case fileExtensions = "File Extensions"
     case hideDock       = "Hide Dock"
     case hideBar        = "Hide Bar"
-    case launchAtLogin  = "Launch at Login"
 
     var id: String { rawValue }
 
@@ -26,7 +24,6 @@ private enum CustomizeFeature: String, CaseIterable, Identifiable {
         case .fileExtensions: return "doc.badge.gearshape"
         case .hideDock:       return "dock.rectangle"
         case .hideBar:        return "menubar.rectangle"
-        case .launchAtLogin:  return "power.circle"
         }
     }
 }
@@ -42,11 +39,10 @@ private enum ArrowKey {
 
 struct GeneralSettingsPage: View {
     @EnvironmentObject var model: AppModel
-    @Binding var launchAtLogin: Bool
-    @Binding var launchAtLoginError: String?
     let onQuit: (() -> Void)?
 
     @Environment(\.heyBarTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedFeature: CustomizeFeature? = .keepAwake
     @State private var keyMonitor: Any?
 
@@ -59,7 +55,9 @@ struct GeneralSettingsPage: View {
         .navigationTitle("Customize")
         .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
         .onAppear {
-            refreshControllers()
+            DispatchQueue.main.async {
+                refreshControllers()
+            }
             guard keyMonitor == nil else { return }
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 guard event.keyCode == ArrowKey.down || event.keyCode == ArrowKey.up
@@ -91,7 +89,7 @@ struct GeneralSettingsPage: View {
                             toggleBinding: featureToggleBinding(feature),
                             theme: theme
                         ) {
-                            withAnimation(.easeOut(duration: 0.12)) {
+                            withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
                                 selectedFeature = feature
                             }
                         }
@@ -102,7 +100,7 @@ struct GeneralSettingsPage: View {
             Divider()
             activeCountFooter
         }
-        .frame(width: 240)
+        .frame(width: SettingsLayout.generalSidebarWidth)
         .background(Color(nsColor: theme.settingsSidebarSurfaceColor))
     }
 
@@ -156,12 +154,6 @@ struct GeneralSettingsPage: View {
         case .fileExtensions: ShowFileExtensionsSettingsSection(controller: model.fileExtensions)
         case .hideDock:       HideDockSettingsSection(controller: model.hideDock)
         case .hideBar:        HideBarSettingsSection(controller: model.hideBar)
-        case .launchAtLogin:
-            LaunchAtLoginSection(
-                launchAtLogin: $launchAtLogin,
-                launchAtLoginError: $launchAtLoginError,
-                onToggle: applyLaunchAtLogin
-            )
         }
     }
 
@@ -175,7 +167,7 @@ struct GeneralSettingsPage: View {
             return
         }
         let newIdx = max(0, min(all.count - 1, idx + offset))
-        withAnimation(.easeOut(duration: 0.12)) { selectedFeature = all[newIdx] }
+        withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) { selectedFeature = all[newIdx] }
     }
 
     private func featureStatus(_ feature: CustomizeFeature) -> String {
@@ -188,7 +180,6 @@ struct GeneralSettingsPage: View {
         case .fileExtensions: return model.fileExtensions.isEnabled ? "Visible" : "Hidden"
         case .hideDock:       return model.hideDock.isEnabled ? "On" : "Off"
         case .hideBar:        return model.hideBar.isEnabled ? "On" : "Off"
-        case .launchAtLogin:  return launchAtLogin ? "Enabled" : "Disabled"
         }
     }
 
@@ -202,18 +193,6 @@ struct GeneralSettingsPage: View {
         case .fileExtensions: return model.fileExtensions.isEnabled
         case .hideDock:       return model.hideDock.isEnabled
         case .hideBar:        return model.hideBar.isEnabled
-        case .launchAtLogin:  return launchAtLogin
-        }
-    }
-
-    private func applyLaunchAtLogin(_ enabled: Bool) {
-        do {
-            if enabled { try SMAppService.mainApp.register() }
-            else       { try SMAppService.mainApp.unregister() }
-            launchAtLogin = enabled
-            launchAtLoginError = nil
-        } catch {
-            launchAtLoginError = UserFacingMessages.launchAtLoginUpdateFailed(error.localizedDescription)
         }
     }
 
@@ -247,11 +226,6 @@ struct GeneralSettingsPage: View {
         case .hideBar:
             let c = model.hideBar
             return Binding(get: { c.isEnabled }, set: { c.setEnabled($0) })
-        case .launchAtLogin:
-            return Binding(
-                get: { launchAtLogin },
-                set: { applyLaunchAtLogin($0) }
-            )
         }
     }
 
@@ -343,33 +317,3 @@ private struct FeatureSidebarRow: View {
     }
 }
 
-// MARK: - Launch at Login Section
-
-private struct LaunchAtLoginSection: View {
-    @Binding var launchAtLogin: Bool
-    @Binding var launchAtLoginError: String?
-    let onToggle: (Bool) -> Void
-    @Environment(\.heyBarTheme) private var theme
-
-    var body: some View {
-        SettingsSectionCard(
-            title: "Launch at Login",
-            subtitle: "Make HeyBar available as soon as your Mac session starts.",
-            statusText: launchAtLogin ? "Enabled" : "Disabled",
-            tone: launchAtLogin ? .positive : .neutral,
-            iconName: "power.circle"
-        ) {
-            Toggle(isOn: Binding(
-                get: { launchAtLogin },
-                set: { onToggle($0) }
-            )) {
-                Label("Launch at Login", systemImage: "power.circle")
-            }
-            .toggleStyle(.switch)
-
-            if let launchAtLoginError {
-                SettingsInlineMessage(text: launchAtLoginError, isError: true)
-            }
-        }
-    }
-}

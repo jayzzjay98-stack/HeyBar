@@ -43,8 +43,11 @@ final class InAppUpdater: ObservableObject {
     }
 
     func startDownload(version: String, downloadURL: String) {
-        guard let url = URL(string: downloadURL) else {
-            state = .failed("Invalid download URL.")
+        guard let url = URL(string: downloadURL),
+              url.scheme == "https",
+              let host = url.host,
+              host == "github.com" || host.hasSuffix(".githubusercontent.com") else {
+            state = .failed("Untrusted download URL.")
             return
         }
         state = .downloading

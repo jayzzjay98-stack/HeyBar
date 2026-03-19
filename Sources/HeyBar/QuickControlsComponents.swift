@@ -243,7 +243,7 @@ final class FeatureTileButton: NSButton {
 
         if animated {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.14
+                context.duration = QuickControlsLayout.panelShowDuration
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 applyChanges()
             }
@@ -254,7 +254,7 @@ final class FeatureTileButton: NSButton {
 
     private func animatePress(scale: CGFloat) {
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.08
+            context.duration = QuickControlsLayout.tilePressDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             layer?.transform = CATransform3DMakeScale(scale, scale, 1)
         }
@@ -264,7 +264,7 @@ final class FeatureTileButton: NSButton {
         let animation = CABasicAnimation(keyPath: "transform.scale")
         animation.fromValue = 0.96
         animation.toValue = 1.0
-        animation.duration = 0.16
+        animation.duration = QuickControlsLayout.tileUpdateDuration
         animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
         badgeBackgroundView.layer?.add(animation, forKey: "statusPulse")
         iconBadgeView.layer?.add(animation, forKey: "iconPulse")

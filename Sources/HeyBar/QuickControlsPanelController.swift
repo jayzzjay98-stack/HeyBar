@@ -18,6 +18,15 @@ enum QuickControlsLayout {
     static let titleInsetHorizontal: CGFloat = 12
     static let titleInsetBottom: CGFloat = 12
     static let settingsButtonHeight: CGFloat = 34
+    static let settingsButtonMinWidth: CGFloat = 112
+    static let quitButtonMinWidth: CGFloat = 96
+    // Animation durations
+    static let panelShowDuration: TimeInterval = 0.14
+    static let panelHideDuration: TimeInterval = 0.12
+    static let tilePressDuration: TimeInterval = 0.08
+    static let tileUpdateDuration: TimeInterval = 0.16
+    static let toastFadeInDuration: TimeInterval = 0.18
+    static let toastFadeOutDuration: TimeInterval = 0.28
 }
 
 @MainActor
@@ -104,7 +113,7 @@ final class QuickControlsPanelController {
 
     private func animateOpen(to finalOrigin: NSPoint) {
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.14
+            context.duration = QuickControlsLayout.panelShowDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1
             panel.animator().setFrameOrigin(finalOrigin)
@@ -119,7 +128,7 @@ final class QuickControlsPanelController {
         isAnimating = true
         let finalOrigin = NSPoint(x: panel.frame.origin.x, y: panel.frame.origin.y - 8)
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
+            context.duration = QuickControlsLayout.panelHideDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             panel.animator().alphaValue = 0
             panel.animator().setFrameOrigin(finalOrigin)
