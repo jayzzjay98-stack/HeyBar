@@ -5,6 +5,7 @@ final class AppModel: ObservableObject {
     @Published var selectedPage: SettingsPage? = .general
     @Published var selectedThemeID: String {
         didSet {
+            guard oldValue != selectedThemeID else { return }
             UserDefaults.standard.set(selectedThemeID, forKey: ThemeCatalog.storageKey)
         }
     }
@@ -26,8 +27,28 @@ final class AppModel: ObservableObject {
 
     var onQuit: (() -> Void)?
 
+    // Observes UserDefaults so theme changes made by the Settings helper
+    // process are picked up immediately in the main (status-bar) process.
+    nonisolated(unsafe) private var defaultsObserver: NSObjectProtocol?
+
     init() {
         selectedThemeID = ThemeCatalog.persistedThemeID() ?? ThemeCatalog.fallbackTheme.id
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: UserDefaults.standard,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            let persisted = ThemeCatalog.persistedThemeID() ?? ThemeCatalog.fallbackTheme.id
+            Task { @MainActor [weak self] in
+                guard let self, persisted != self.selectedThemeID else { return }
+                self.selectedThemeID = persisted
+            }
+        }
+    }
+
+    deinit {
+        defaultsObserver.map { NotificationCenter.default.removeObserver($0) }
     }
 
     var selectedTheme: AppTheme {
