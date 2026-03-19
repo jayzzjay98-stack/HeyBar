@@ -48,6 +48,10 @@ final class SettingsWindowController: NSWindowController {
         window.contentViewController = hostingController
         window.center()
         window.isReleasedWhenClosed = false
+        // Keep the window visible when the user switches to another app.
+        // LSUIElement apps have no Dock presence, so the default hide-on-deactivate
+        // behaviour causes the settings window to vanish unexpectedly.
+        window.hidesOnDeactivate = false
 
         super.init(window: window)
     }
