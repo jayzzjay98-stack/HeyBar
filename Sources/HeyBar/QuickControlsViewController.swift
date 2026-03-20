@@ -21,46 +21,30 @@ final class QuickControlsViewController: NSViewController {
     private var displayTimer: Timer?
     private var themeCancellable: AnyCancellable?
 
-    private let keepAwakeButton = FeatureTileButton(
-        title: "Keep Awake",
-        symbolName: "sparkles.tv",
-        caption: "Session"
-    )
-    private let hiddenFilesButton = FeatureTileButton(
-        title: "Hidden Files",
-        symbolName: "folder.badge.questionmark",
-        caption: "Finder"
-    )
-    private let fileExtensionsButton = FeatureTileButton(
-        title: "File Extensions",
-        symbolName: "doc.badge.gearshape",
-        caption: "Finder"
-    )
-    private let keyLightButton = FeatureTileButton(
-        title: "Key Light",
-        symbolName: "keyboard",
-        caption: "Display"
-    )
-    private let nightShiftButton = FeatureTileButton(
-        title: "Night Shift",
-        symbolName: "moon.stars.fill",
-        caption: "Display"
-    )
-    private let hideDockButton = FeatureTileButton(
-        title: "Hide Dock",
-        symbolName: "dock.rectangle",
-        caption: "Automation"
-    )
-    private let hideBarButton = FeatureTileButton(
-        title: "Hide Bar",
-        symbolName: "menubar.rectangle",
-        caption: "Automation"
-    )
-    private let cleanKeyButton = FeatureTileButton(
-        title: "CleanKey",
-        symbolName: "sparkles",
-        caption: "Apps"
-    )
+    // Cached state to skip redundant work in refresh()
+    private var lastAppliedTheme: AppTheme?
+    private var tooltipUpdateCounter = 0
+
+    // Static NSImages that never change — created once, reused forever
+    private lazy var settingsIcon = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
+    private lazy var quitIcon = NSImage(systemSymbolName: "power", accessibilityDescription: "Quit")
+
+    // All tile buttons keyed by TileID
+    private lazy var allTileButtons: [TileID: FeatureTileButton] = [
+        .keepAwake: FeatureTileButton(title: "Keep Awake", symbolName: "sparkles.tv", caption: "Session"),
+        .hiddenFiles: FeatureTileButton(title: "Hidden Files", symbolName: "folder.badge.questionmark", caption: "Finder"),
+        .fileExtensions: FeatureTileButton(title: "File Extensions", symbolName: "doc.badge.gearshape", caption: "Finder"),
+        .keyLight: FeatureTileButton(title: "Key Light", symbolName: "keyboard", caption: "Display"),
+        .nightShift: FeatureTileButton(title: "Night Shift", symbolName: "moon.stars.fill", caption: "Display"),
+        .hideDock: FeatureTileButton(title: "Hide Dock", symbolName: "dock.rectangle", caption: "Automation"),
+        .hideBar: FeatureTileButton(title: "Hide Bar", symbolName: "menubar.rectangle", caption: "Automation"),
+        .cleanKey: FeatureTileButton(title: "CleanKey", symbolName: "sparkles", caption: "Apps")
+    ]
+
+    // Content stack (stored so we can add/remove tile rows)
+    private var contentStack: NSStackView!
+    private var currentTileRows: [NSStackView] = []
+
 
     init(model: AppModel, openSettings: @escaping () -> Void) {
         self.model = model
@@ -86,30 +70,33 @@ final class QuickControlsViewController: NSViewController {
         backgroundView.wantsLayer = true
 
         setupCloseButton()
-        configureTileActions()
         setupFooterButtons()
         setupToastView()
 
-        let tileRow1 = makeTileRow([keepAwakeButton, hiddenFilesButton])
-        let tileRow2 = makeTileRow([fileExtensionsButton, keyLightButton])
-        let tileRow3 = makeTileRow([nightShiftButton, hideDockButton])
-        let tileRow4 = makeTileRow([hideBarButton, cleanKeyButton])
-        let tileRows = [tileRow1, tileRow2, tileRow3, tileRow4]
+        // Set height constraints on all tile buttons
+        for button in allTileButtons.values {
+            button.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight).isActive = true
+        }
+
+        configureTileActions()
 
         let topBar = makeTopBar()
         let footerBar = makeFooterBar()
-        let contentStack = makeContentStack(topBar: topBar, tileRows: tileRows, footerBar: footerBar)
+
+        contentStack = NSStackView(views: [topBar, footerBar])
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.orientation = .vertical
+        contentStack.alignment = .leading
+        contentStack.spacing = QuickControlsLayout.stackSpacing
+
+        // Insert tile rows between topBar and footerBar
+        rebuildTileGrid()
 
         backgroundView.addSubview(contentStack)
         view.addSubview(backgroundView)
         view.addSubview(toastView)
 
-        activateLayoutConstraints(
-            contentStack: contentStack,
-            topBar: topBar,
-            footerBar: footerBar,
-            tileRows: tileRows
-        )
+        activateLayoutConstraints(topBar: topBar, footerBar: footerBar)
 
         refresh()
     }
@@ -181,22 +168,8 @@ final class QuickControlsViewController: NSViewController {
         return bar
     }
 
-    private func makeContentStack(topBar: NSStackView, tileRows: [NSStackView], footerBar: NSStackView) -> NSStackView {
-        let stack = NSStackView(views: [topBar] + tileRows + [footerBar])
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = QuickControlsLayout.stackSpacing
-        return stack
-    }
-
-    private func activateLayoutConstraints(
-        contentStack: NSStackView,
-        topBar: NSStackView,
-        footerBar: NSStackView,
-        tileRows: [NSStackView]
-    ) {
-        var constraints: [NSLayoutConstraint] = [
+    private func activateLayoutConstraints(topBar: NSStackView, footerBar: NSStackView) {
+        let constraints: [NSLayoutConstraint] = [
             backgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -222,15 +195,79 @@ final class QuickControlsViewController: NSViewController {
             toastView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16),
             toastView.heightAnchor.constraint(equalToConstant: 30),
         ]
-
-        let allTileButtons = [keepAwakeButton, hiddenFilesButton, fileExtensionsButton,
-                              keyLightButton, nightShiftButton, hideDockButton,
-                              hideBarButton, cleanKeyButton]
-        constraints += tileRows.map { $0.widthAnchor.constraint(equalTo: contentStack.widthAnchor) }
-        constraints += allTileButtons.map { $0.heightAnchor.constraint(equalToConstant: QuickControlsLayout.tileHeight) }
-
         NSLayoutConstraint.activate(constraints)
     }
+
+    // MARK: - Tile Grid
+
+    private func rebuildTileGrid() {
+        // Remove old rows
+        for row in currentTileRows {
+            contentStack.removeArrangedSubview(row)
+            row.removeFromSuperview()
+        }
+        currentTileRows.removeAll()
+
+        let store = TileOrderStore.shared
+        let orderedIDs = store.order.filter { !store.hidden.contains($0) }
+
+        // Build rows of 2
+        var rows: [NSStackView] = []
+        var i = 0
+        while i < orderedIDs.count {
+            let left = orderedIDs[i]
+            let right = i + 1 < orderedIDs.count ? orderedIDs[i + 1] : nil
+
+            let buttons: [NSView]
+            if let right = right, let leftBtn = allTileButtons[left], let rightBtn = allTileButtons[right] {
+                buttons = [leftBtn, rightBtn]
+            } else if let leftBtn = allTileButtons[left] {
+                buttons = [leftBtn]
+            } else {
+                i += 2
+                continue
+            }
+
+            let row = makeTileRow(buttons)
+            rows.append(row)
+            i += 2
+        }
+
+        // Insert rows between topBar and footerBar, then activate width constraints
+        let insertIndex = contentStack.arrangedSubviews.count - 1 // before footerBar
+        for (idx, row) in rows.enumerated() {
+            contentStack.insertArrangedSubview(row, at: insertIndex + idx)
+            // Activate width constraint AFTER adding to the same hierarchy
+            row.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+        }
+        currentTileRows = rows
+    }
+
+
+    // MARK: - Computed Size
+
+    /// Rebuild the tile grid and return the size the panel should use.
+    /// Call this BEFORE making the panel visible so the layout is correct on first show.
+    func prepareForShow() -> NSSize {
+        rebuildTileGrid()
+        view.layoutSubtreeIfNeeded()
+        return computedPanelSize()
+    }
+
+    private func computedPanelSize() -> NSSize {
+        let store = TileOrderStore.shared
+        let visibleCount = store.order.filter { !store.hidden.contains($0) }.count
+        let numRows = max(1, (visibleCount + 1) / 2)
+        let L = QuickControlsLayout.self
+        let stackH = L.closeButtonSize
+            + CGFloat(numRows + 1) * L.stackSpacing
+            + CGFloat(numRows) * L.tileHeight
+            + L.footerButtonHeight
+        let panelH = 2 * L.panelInset + stackH
+        return NSSize(width: L.panelSize.width, height: panelH)
+    }
+
+    // MARK: - View Lifecycle
 
     override func viewWillAppear() {
         super.viewWillAppear()
@@ -256,89 +293,123 @@ final class QuickControlsViewController: NSViewController {
         displayTimer = nil
     }
 
+    // MARK: - Refresh
+
     func refresh() {
+        // Sync fast controllers from system so tiles reflect external changes
+        // (e.g. user toggled Night Shift from System Settings while panel is open).
+        model.nightShift.refresh()
+        model.keyLight.refresh()
+
         let theme = model.selectedTheme
-        applyTheme(theme)
 
-        let keepAwakeOn = model.keepAwake.isEnabled
-        let keepAwakeBadge = keepAwakeCountdownText() ?? (keepAwakeOn ? "ON" : "OFF")
-        applyTileState(
-            QuickControlsTileState(badgeText: keepAwakeBadge, badgeStyle: keepAwakeOn ? .on : .off, isEnabled: true, alternate: false),
-            to: keepAwakeButton,
-            theme: theme,
-            symbolName: keepAwakeOn ? "bolt.fill" : "sparkles.tv",
-            captionOverride: shortcutLabel(for: .keepAwake)
-        )
+        // Only re-apply chrome/background when theme actually changes.
+        if theme != lastAppliedTheme {
+            applyTheme(theme)
+            lastAppliedTheme = theme
+        }
 
-        let hiddenOn = model.hiddenFiles.isEnabled
-        applyTileState(.standard(isOn: hiddenOn, alternate: true), to: hiddenFilesButton, theme: theme,
-            symbolName: hiddenOn ? "folder.fill.badge.questionmark" : "folder.badge.questionmark",
-            captionOverride: shortcutLabel(for: .showHiddenFiles)
-        )
+        let store = TileOrderStore.shared
+        for (id, button) in allTileButtons where !store.hidden.contains(id) {
+            applyTileStateForID(id, button: button, theme: theme)
+        }
 
-        let extOn = model.fileExtensions.isEnabled
-        applyTileState(.standard(isOn: extOn, alternate: true), to: fileExtensionsButton, theme: theme,
-            captionOverride: shortcutLabel(for: .showFileExtensions)
-        )
+        // Tooltips almost never change — update every 10 seconds instead of every second.
+        tooltipUpdateCounter += 1
+        if tooltipUpdateCounter >= 10 {
+            tooltipUpdateCounter = 0
+            updateTooltips()
+        }
+    }
 
-        applyTileState(
-            .supportedFeature(isSupported: model.keyLight.isSupported, isOn: model.keyLight.isEnabled, alternate: false),
-            to: keyLightButton,
-            theme: theme,
-            captionOverride: shortcutLabel(for: .keyLight)
-        )
+    private func applyTileStateForID(_ id: TileID, button: FeatureTileButton, theme: AppTheme) {
+        switch id {
+        case .keepAwake:
+            let keepAwakeOn = model.keepAwake.isEnabled
+            let keepAwakeBadge = keepAwakeCountdownText() ?? (keepAwakeOn ? "ON" : "OFF")
+            applyTileState(
+                QuickControlsTileState(badgeText: keepAwakeBadge, badgeStyle: keepAwakeOn ? .on : .off, isEnabled: true, alternate: false),
+                to: button,
+                theme: theme,
+                symbolName: keepAwakeOn ? "bolt.fill" : "sparkles.tv",
+                captionOverride: shortcutLabel(for: .keepAwake)
+            )
 
-        let nightOn = model.nightShift.isEnabled
-        applyTileState(
-            .supportedFeature(isSupported: model.nightShift.isSupported, isOn: nightOn, alternate: false),
-            to: nightShiftButton,
-            theme: theme,
-            symbolName: nightOn ? "moon.stars.fill" : "moon.stars",
-            captionOverride: shortcutLabel(for: .nightShift)
-        )
+        case .hiddenFiles:
+            let hiddenOn = model.hiddenFiles.isEnabled
+            applyTileState(.standard(isOn: hiddenOn, alternate: true), to: button, theme: theme,
+                symbolName: hiddenOn ? "folder.fill.badge.questionmark" : "folder.badge.questionmark",
+                captionOverride: shortcutLabel(for: .showHiddenFiles)
+            )
 
-        let dockOn = model.hideDock.isEnabled
-        applyTileState(.standard(isOn: dockOn, alternate: true), to: hideDockButton, theme: theme,
-            symbolName: dockOn ? "dock.arrow.down.rectangle" : "dock.rectangle",
-            captionOverride: shortcutLabel(for: .hideDock)
-        )
+        case .fileExtensions:
+            let extOn = model.fileExtensions.isEnabled
+            applyTileState(.standard(isOn: extOn, alternate: true), to: button, theme: theme,
+                captionOverride: shortcutLabel(for: .showFileExtensions)
+            )
 
-        let barOn = model.hideBar.isEnabled
-        applyTileState(.standard(isOn: barOn, alternate: false), to: hideBarButton, theme: theme,
-            symbolName: barOn ? "menubar.arrow.up.rectangle" : "menubar.rectangle",
-            captionOverride: shortcutLabel(for: .hideBar)
-        )
+        case .keyLight:
+            applyTileState(
+                .supportedFeature(isSupported: model.keyLight.isSupported, isOn: model.keyLight.isEnabled, alternate: false),
+                to: button,
+                theme: theme,
+                captionOverride: shortcutLabel(for: .keyLight)
+            )
 
-        applyTileState(
-            QuickControlsTileState(
-                badgeText: model.cleanKey.isCleaning ? model.cleanKey.remainingBadgeText : "START",
-                badgeStyle: model.cleanKey.isCleaning ? .on : .off,
-                isEnabled: true,
-                alternate: true
-            ),
-            to: cleanKeyButton,
-            theme: theme,
-            symbolName: model.cleanKey.isCleaning ? "lock.fill" : "sparkles",
-            captionOverride: shortcutLabel(for: .cleanKey) ?? "Cleaning"
-        )
+        case .nightShift:
+            let nightOn = model.nightShift.isEnabled
+            applyTileState(
+                .supportedFeature(isSupported: model.nightShift.isSupported, isOn: nightOn, alternate: false),
+                to: button,
+                theme: theme,
+                symbolName: nightOn ? "moon.stars.fill" : "moon.stars",
+                captionOverride: shortcutLabel(for: .nightShift)
+            )
 
-        updateTooltips()
+        case .hideDock:
+            let dockOn = model.hideDock.isEnabled
+            applyTileState(.standard(isOn: dockOn, alternate: true), to: button, theme: theme,
+                symbolName: dockOn ? "dock.arrow.down.rectangle" : "dock.rectangle",
+                captionOverride: shortcutLabel(for: .hideDock)
+            )
+
+        case .hideBar:
+            let barOn = model.hideBar.isEnabled
+            applyTileState(.standard(isOn: barOn, alternate: false), to: button, theme: theme,
+                symbolName: barOn ? "menubar.arrow.up.rectangle" : "menubar.rectangle",
+                captionOverride: shortcutLabel(for: .hideBar)
+            )
+
+        case .cleanKey:
+            applyTileState(
+                QuickControlsTileState(
+                    badgeText: model.cleanKey.isCleaning ? model.cleanKey.remainingBadgeText : "START",
+                    badgeStyle: model.cleanKey.isCleaning ? .on : .off,
+                    isEnabled: true,
+                    alternate: true
+                ),
+                to: button,
+                theme: theme,
+                symbolName: model.cleanKey.isCleaning ? "lock.fill" : "sparkles",
+                captionOverride: shortcutLabel(for: .cleanKey) ?? "Cleaning"
+            )
+        }
     }
 
     private func updateTooltips() {
-        keyLightButton.toolTip = model.keyLight.isSupported
+        allTileButtons[.keyLight]?.toolTip = model.keyLight.isSupported
             ? "Toggle keyboard backlight"
             : "Key Light is unavailable on this Mac"
-        nightShiftButton.toolTip = model.nightShift.isSupported
+        allTileButtons[.nightShift]?.toolTip = model.nightShift.isSupported
             ? "Toggle Night Shift"
             : "Night Shift is unavailable on this Mac"
-        hideDockButton.toolTip = model.hideDock.lastError == nil
+        allTileButtons[.hideDock]?.toolTip = model.hideDock.lastError == nil
             ? "Toggle Dock auto-hide"
             : "Automation permission may be required"
-        hideBarButton.toolTip = model.hideBar.lastError == nil
+        allTileButtons[.hideBar]?.toolTip = model.hideBar.lastError == nil
             ? "Toggle menu bar auto-hide"
             : "Automation permission may be required"
-        cleanKeyButton.toolTip = model.cleanKey.isCleaning
+        allTileButtons[.cleanKey]?.toolTip = model.cleanKey.isCleaning
             ? "Stop CleanKey mode"
             : "Start CleanKey mode"
         quitButton.toolTip = "Quit HeyBar"
@@ -361,6 +432,8 @@ final class QuickControlsViewController: NSViewController {
     private func shortcutLabel(for action: ShortcutAction) -> String? {
         model.shortcuts.shortcut(for: action)?.displayString
     }
+
+    // MARK: - Feature Toggles
 
     @objc private func toggleKeepAwake() {
         model.toggleKeepAwake()
@@ -437,6 +510,8 @@ final class QuickControlsViewController: NSViewController {
         }
     }
 
+    // MARK: - Toast
+
     private func showToast(_ message: String) {
         toastLabel.stringValue = message
         toastView.layer?.removeAllAnimations()
@@ -461,6 +536,8 @@ final class QuickControlsViewController: NSViewController {
         return error
     }
 
+    // MARK: - Actions
+
     @objc private func openSettingsAction() {
         openSettings()
         onClose?()
@@ -475,6 +552,8 @@ final class QuickControlsViewController: NSViewController {
         onClose?()
     }
 
+    // MARK: - Theme
+
     private func applyTheme(_ theme: AppTheme) {
         backgroundView.apply(theme: theme)
 
@@ -487,14 +566,14 @@ final class QuickControlsViewController: NSViewController {
         settingsButton.layer?.backgroundColor = theme.settingsAccentSoftFill.cgColor
         settingsButton.layer?.borderWidth = 1
         settingsButton.layer?.borderColor = theme.settingsSidebarBorderColor.cgColor
-        settingsButton.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
+        settingsButton.image = settingsIcon
         settingsButton.contentTintColor = theme.settingsTint
 
         quitButton.font = theme.quickControlsButtonFont
         quitButton.layer?.backgroundColor = theme.settingsChromeSurfaceColor.cgColor
         quitButton.layer?.borderWidth = 1
         quitButton.layer?.borderColor = theme.settingsSidebarBorderColor.cgColor
-        quitButton.image = NSImage(systemSymbolName: "power", accessibilityDescription: "Quit")
+        quitButton.image = quitIcon
         quitButton.contentTintColor = theme.closeTint
 
         toastView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.72).cgColor
@@ -502,23 +581,27 @@ final class QuickControlsViewController: NSViewController {
         toastLabel.font = .systemFont(ofSize: 12, weight: .medium)
     }
 
+    // MARK: - Tile Actions
+
     private func configureTileActions() {
-        setAction(#selector(toggleKeepAwake), for: keepAwakeButton)
-        setAction(#selector(toggleHiddenFiles), for: hiddenFilesButton)
-        setAction(#selector(toggleFileExtensions), for: fileExtensionsButton)
-        setAction(#selector(toggleKeyLight), for: keyLightButton)
-        setAction(#selector(toggleNightShift), for: nightShiftButton)
-        setAction(#selector(toggleHideDock), for: hideDockButton)
-        setAction(#selector(toggleHideBar), for: hideBarButton)
-        setAction(#selector(openCleanKey), for: cleanKeyButton)
+        let actionMap: [TileID: Selector] = [
+            .keepAwake: #selector(toggleKeepAwake),
+            .hiddenFiles: #selector(toggleHiddenFiles),
+            .fileExtensions: #selector(toggleFileExtensions),
+            .keyLight: #selector(toggleKeyLight),
+            .nightShift: #selector(toggleNightShift),
+            .hideDock: #selector(toggleHideDock),
+            .hideBar: #selector(toggleHideBar),
+            .cleanKey: #selector(openCleanKey)
+        ]
+
+        for (id, selector) in actionMap {
+            allTileButtons[id]?.target = self
+            allTileButtons[id]?.action = selector
+        }
     }
 
-    private func setAction(_ action: Selector, for button: FeatureTileButton) {
-        button.target = self
-        button.action = action
-    }
-
-    private func makeTileRow(_ buttons: [FeatureTileButton]) -> NSStackView {
+    private func makeTileRow(_ buttons: [NSView]) -> NSStackView {
         let row = NSStackView(views: buttons)
         row.orientation = .horizontal
         row.distribution = .fillEqually

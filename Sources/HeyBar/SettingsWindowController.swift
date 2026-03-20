@@ -40,6 +40,7 @@ final class SettingsWindowController: NSWindowController {
     private let hostingController: NSHostingController<SettingsView>
     var onWindowClose: (() -> Void)?
     private var cmdWMonitor: Any?
+    nonisolated(unsafe) private var appActivationObserver: NSObjectProtocol?
 
     init(model: AppModel) {
         self.model = model
@@ -48,7 +49,7 @@ final class SettingsWindowController: NSWindowController {
 
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: SettingsLayout.windowSize),
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
@@ -59,10 +60,7 @@ final class SettingsWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.animationBehavior = .none
-        // Prevent macOS from hiding the window when HeyBar loses active status.
         window.hidesOnDeactivate = false
-        // Let macOS properly manage this window in Mission Control / z-order.
-        window.collectionBehavior = [.managed, .participatesInCycle]
 
         super.init(window: window)
 
@@ -82,9 +80,44 @@ final class SettingsWindowController: NSWindowController {
             Task { @MainActor [weak self] in
                 if let monitor = self?.cmdWMonitor {
                     NSEvent.removeMonitor(monitor)
+                    self?.cmdWMonitor = nil
                 }
                 self?.onWindowClose?()
             }
+        }
+
+        // When another app gains focus because its window closed (not because
+        // the user explicitly clicked it), bring the Settings window back to front.
+        var otherWindowWillClose = false
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let closingWindow = notification.object as? NSWindow,
+                  closingWindow !== self?.window else { return }
+            otherWindowWillClose = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                otherWindowWillClose = false
+            }
+        }
+
+        appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard otherWindowWillClose,
+                  let self,
+                  let w = self.window, w.isVisible else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            w.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    deinit {
+        if let appActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver)
         }
     }
 
@@ -95,15 +128,23 @@ final class SettingsWindowController: NSWindowController {
 
     func present() {
         guard let window else { return }
-        hostingController.rootView = SettingsView(model: model)
+        // Re-install ⌘W monitor if it was removed when the window last closed.
+        if cmdWMonitor == nil {
+            cmdWMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard event.modifierFlags.contains(.command),
+                      event.charactersIgnoringModifiers == "w" else { return event }
+                self?.window?.performClose(nil)
+                return nil
+            }
+        }
         if window.isMiniaturized {
             window.deminiaturize(nil)
         }
         // First pass: set a reasonable frame before the window is shown
         // so there is no visible flash at the wrong position.
         centerWindowOnActiveScreen(window)
+        NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
         // Second pass: correct any frame adjustment that macOS or SwiftUI
         // applied when laying out the content after the window appeared.
         DispatchQueue.main.async { [weak self] in

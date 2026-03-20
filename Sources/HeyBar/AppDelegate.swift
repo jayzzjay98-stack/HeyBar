@@ -58,10 +58,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsWindowController = controller
         controller.present()
-        // Activate without switching policy — avoids the Dock-icon flash that
-        // setActivationPolicy(.regular) causes.  LSUIElement apps can receive
-        // keyboard input this way without appearing in the Dock.
-        NSApp.activate(ignoringOtherApps: true)
     }
 
     // MARK: - Onboarding

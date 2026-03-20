@@ -22,6 +22,10 @@ final class FeatureTileButton: NSButton {
     private var currentBadgeStyle: BadgeStyle = .off
     private var currentEnabled = true
     private let originalCaption: String
+    private var lastBadgeText: String = ""
+    private var lastAlternate: Bool = false
+    private var lastSymbolName: String? = nil
+    private var lastCaptionOverride: String? = nil
 
     init(title: String, symbolName: String, caption: String) {
         originalCaption = caption
@@ -170,6 +174,15 @@ final class FeatureTileButton: NSButton {
         symbolName: String? = nil,
         captionOverride: String? = nil
     ) {
+        let nothingChanged = theme == currentTheme
+            && badgeStyle == currentBadgeStyle
+            && enabled == currentEnabled
+            && badgeText == lastBadgeText
+            && alternate == lastAlternate
+            && symbolName == lastSymbolName
+            && captionOverride == lastCaptionOverride
+        guard !nothingChanged else { return }
+
         let previousBadgeStyle = currentBadgeStyle
         badgeField.stringValue = badgeText
         isEnabled = enabled
@@ -183,6 +196,10 @@ final class FeatureTileButton: NSButton {
         currentTheme = theme
         currentBadgeStyle = badgeStyle
         currentEnabled = enabled
+        lastBadgeText = badgeText
+        lastAlternate = alternate
+        lastSymbolName = symbolName
+        lastCaptionOverride = captionOverride
         titleField.textColor = foreground
         captionField.textColor = foreground.withAlphaComponent(0.8)
         captionField.stringValue = (captionOverride ?? originalCaption).uppercased()
@@ -269,6 +286,7 @@ final class FeatureTileButton: NSButton {
         badgeBackgroundView.layer?.add(animation, forKey: "statusPulse")
         iconBadgeView.layer?.add(animation, forKey: "iconPulse")
     }
+
 }
 
 final class GradientPanelBackgroundView: NSView {

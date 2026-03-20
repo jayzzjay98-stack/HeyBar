@@ -1,5 +1,12 @@
 import SwiftUI
 
+// MARK: - Sidebar Selection
+
+private enum SidebarSelection: Hashable {
+    case feature(CustomizeFeature)
+    case panelLayout
+}
+
 // MARK: - Feature List
 
 private enum CustomizeFeature: String, CaseIterable, Identifiable {
@@ -43,7 +50,7 @@ struct GeneralSettingsPage: View {
 
     @Environment(\.heyBarTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var selectedFeature: CustomizeFeature? = .keepAwake
+    @State private var selection: SidebarSelection? = .feature(.keepAwake)
     @State private var keyMonitor: Any?
 
     var body: some View {
@@ -83,15 +90,28 @@ struct GeneralSettingsPage: View {
                     ForEach(CustomizeFeature.allCases) { feature in
                         FeatureSidebarRow(
                             feature: feature,
-                            isSelected: selectedFeature == feature,
+                            isSelected: selection == .feature(feature),
                             statusText: featureStatus(feature),
                             isActive: featureIsActive(feature),
                             toggleBinding: featureToggleBinding(feature),
                             theme: theme
                         ) {
                             withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
-                                selectedFeature = feature
+                                selection = .feature(feature)
                             }
+                        }
+                    }
+
+                    Divider()
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+
+                    PanelLayoutSidebarRow(
+                        isSelected: selection == .panelLayout,
+                        theme: theme
+                    ) {
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
+                            selection = .panelLayout
                         }
                     }
                 }
@@ -126,11 +146,14 @@ struct GeneralSettingsPage: View {
 
     @ViewBuilder
     private var detailPanel: some View {
-        if let feature = selectedFeature {
+        switch selection {
+        case .feature(let feature):
             SettingsPageScroll {
                 featureDetailContent(feature)
             }
-        } else {
+        case .panelLayout:
+            PanelSettingsPage()
+        case nil:
             VStack(spacing: 10) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 32, weight: .light))
@@ -161,13 +184,21 @@ struct GeneralSettingsPage: View {
 
     private func moveSelection(by offset: Int) {
         let all = CustomizeFeature.allCases
-        guard let current = selectedFeature,
-              let idx = all.firstIndex(of: current) else {
-            selectedFeature = all.first
-            return
+        if case .feature(let current) = selection,
+           let idx = all.firstIndex(of: current) {
+            let newIdx = max(0, min(all.count - 1, idx + offset))
+            withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
+                selection = .feature(all[newIdx])
+            }
+        } else if selection == .panelLayout && offset < 0 {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
+                selection = .feature(all[all.count - 1])
+            }
+        } else if case .feature(_) = selection, offset > 0 {
+            // reached end of features — could move to panelLayout
+        } else {
+            selection = .feature(all.first ?? .keepAwake)
         }
-        let newIdx = max(0, min(all.count - 1, idx + offset))
-        withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) { selectedFeature = all[newIdx] }
     }
 
     private func featureStatus(_ feature: CustomizeFeature) -> String {
@@ -240,7 +271,7 @@ struct GeneralSettingsPage: View {
     }
 }
 
-// MARK: - Sidebar Row
+// MARK: - Feature Sidebar Row
 
 private struct FeatureSidebarRow: View {
     let feature: CustomizeFeature
@@ -317,3 +348,63 @@ private struct FeatureSidebarRow: View {
     }
 }
 
+// MARK: - Panel Layout Sidebar Row
+
+private struct PanelLayoutSidebarRow: View {
+    let isSelected: Bool
+    let theme: AppTheme
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @State private var visibleCount: Int = TileOrderStore.shared.order.filter { !TileOrderStore.shared.hidden.contains($0) }.count
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(isSelected ? Color(nsColor: theme.settingsTint) : .clear)
+                    .frame(width: 3, height: 34)
+
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(
+                        isSelected
+                        ? Color(nsColor: theme.settingsTint)
+                        : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.75)
+                    )
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                isSelected
+                                ? Color(nsColor: theme.settingsTint).opacity(0.15)
+                                : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.08)
+                            )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Panel Layout")
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                        .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
+                        .lineLimit(1)
+                    Text("\(visibleCount) of \(TileID.allCases.count) visible")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.4))
+                }
+
+                Spacer()
+            }
+            .frame(height: 48)
+            .background(
+                isSelected
+                ? Color(nsColor: theme.settingsTint).opacity(0.08)
+                : isHovered
+                    ? Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.05)
+                    : Color.clear
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
+}

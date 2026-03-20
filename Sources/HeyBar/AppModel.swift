@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -37,6 +37,8 @@ final class AppModel: ObservableObject {
     static let themeDidChangeNotification = Notification.Name("com.gravity.heybar.themeDidChange")
 
     nonisolated(unsafe) private var themeObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var finderObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var dockPrefObserver: NSObjectProtocol?
 
     init() {
         selectedThemeID = ThemeCatalog.persistedThemeID() ?? ThemeCatalog.fallbackTheme.id
@@ -52,10 +54,38 @@ final class AppModel: ObservableObject {
                 self.selectedThemeID = persisted
             }
         }
+
+        // Finder relaunch means hidden-files or file-extension settings changed externally.
+        finderObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.bundleIdentifier == "com.apple.finder" else { return }
+            Task { @MainActor [weak self] in
+                self?.hiddenFiles.refresh()
+                self?.fileExtensions.refresh()
+            }
+        }
+
+        // Dock preference change covers both Hide Dock and Hide Bar (menu bar autohide).
+        dockPrefObserver = DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.apple.dock.prefChanged"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.hideDock.refresh()
+                self?.hideBar.refresh()
+            }
+        }
     }
 
     deinit {
         themeObserver.map { DistributedNotificationCenter.default().removeObserver($0) }
+        finderObserver.map { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        dockPrefObserver.map { DistributedNotificationCenter.default().removeObserver($0) }
     }
 
     var selectedTheme: AppTheme {
