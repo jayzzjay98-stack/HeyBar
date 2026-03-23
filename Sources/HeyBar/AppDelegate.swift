@@ -72,9 +72,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         })
         statusBarController?.setVisible(true)
 
-        // Pre-warm the settings helper so the first open is instant.
-        prewarmSettingsHelper()
-
         if !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
             showOnboarding()
         }
@@ -139,11 +136,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Launch the helper process ahead of time so the first Settings open is instant.
-    private func prewarmSettingsHelper() {
-        launchSettingsHelper(standby: true)
-    }
-
     private func launchSettingsHelper(standby: Bool) {
         guard let executableURL = Bundle.main.executableURL else { return }
         let process = Process()
@@ -175,10 +167,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let controller = SettingsWindowController(model: model)
-        // On close: hide Dock icon but stay alive so the next open is instant.
+        // On close: terminate the helper so Finder/App launch always starts the main app.
         controller.onWindowClose = { [weak self] in
             self?.settingsWindowController = nil
-            NSApp.setActivationPolicy(.accessory)
+            NSApp.terminate(nil)
         }
         settingsWindowController = controller
         controller.present()

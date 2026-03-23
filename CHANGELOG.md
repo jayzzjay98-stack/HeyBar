@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.1.2] - 2026-03-23
+
+### Fixed
+- menu-bar: opening HeyBar after a full quit now reliably restores the main menu bar app instead of reviving the Settings helper without a status item
+- settings: closing the Settings helper now fully terminates the helper process, preventing relaunch confusion between the main app and the Settings window host
+
 ## [v1.1.1] - 2026-03-23
 
 ### Fixed
