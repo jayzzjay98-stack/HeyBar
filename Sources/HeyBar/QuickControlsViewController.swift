@@ -1,5 +1,5 @@
 import AppKit
-import Combine
+@preconcurrency import Combine
 
 @MainActor
 final class QuickControlsViewController: NSViewController {
@@ -20,6 +20,7 @@ final class QuickControlsViewController: NSViewController {
     // Countdown refresh timer (runs while panel is visible)
     private var displayTimer: Timer?
     private var themeCancellable: AnyCancellable?
+    nonisolated(unsafe) private var tileOrderObserver: NSObjectProtocol?
 
     // Cached state to skip redundant work in refresh()
     private var lastAppliedTheme: AppTheme?
@@ -54,11 +55,25 @@ final class QuickControlsViewController: NSViewController {
             .dropFirst()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refresh() }
+        tileOrderObserver = DistributedNotificationCenter.default().addObserver(
+            forName: TileOrderStore.didChangeNotification,
+            object: Bundle.main.bundleIdentifier,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleTileOrderChange()
+            }
+        }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        themeCancellable?.cancel()
+        tileOrderObserver.map { DistributedNotificationCenter.default().removeObserver($0) }
     }
 
     override func loadView() {
@@ -207,6 +222,8 @@ final class QuickControlsViewController: NSViewController {
     // MARK: - Tile Grid
 
     private func rebuildTileGrid() {
+        TileOrderStore.shared.reload()
+
         // Remove old rows
         for row in currentTileRows {
             contentStack.removeArrangedSubview(row)
@@ -249,6 +266,13 @@ final class QuickControlsViewController: NSViewController {
         currentTileRows = rows
     }
 
+    private func handleTileOrderChange() {
+        TileOrderStore.shared.reload()
+        rebuildTileGrid()
+        view.layoutSubtreeIfNeeded()
+        refresh()
+    }
+
 
     // MARK: - Computed Size
 
@@ -261,6 +285,7 @@ final class QuickControlsViewController: NSViewController {
     }
 
     private func computedPanelSize() -> NSSize {
+        TileOrderStore.shared.reload()
         let store = TileOrderStore.shared
         let visibleCount = store.order.filter { !store.hidden.contains($0) }.count
         let numRows = max(1, (visibleCount + 1) / 2)
@@ -302,6 +327,8 @@ final class QuickControlsViewController: NSViewController {
     // MARK: - Refresh
 
     func refresh() {
+        TileOrderStore.shared.reload()
+
         // Sync fast controllers from system so tiles reflect external changes
         // (e.g. user toggled Night Shift from System Settings while panel is open).
         model.nightShift.refresh()

@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.1.1] - 2026-03-23
+
+### Fixed
+- quick-controls: panel order and visibility now stay in sync with the Customize page, including updates coming from the Settings helper process
+
+## [v1.1.0] - 2026-03-23
+
+### Changed
+- settings: move the Settings experience onto a helper-process path so HeyBar can stay menu-bar-first without forcing a permanent Dock icon
+- settings: reduce opening flicker and simplify helper activation when opening Settings from Quick Controls
+
+### Fixed
+- dock: remove the main-app Dock icon from the normal menu-bar flow
+
+### Known Issues
+- settings: opening Settings from the menu bar can still reopen the window at a stale position instead of centered; see `KNOWN_ISSUES.md`
+
 ## [v0.2.0] - 2026-03-19
 
 ### Added
