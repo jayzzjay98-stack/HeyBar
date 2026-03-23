@@ -33,7 +33,7 @@ final class ShortcutRecorderButton: NSButton {
         bezelStyle = .regularSquare
         wantsLayer = true
         layer?.cornerRadius = 8
-        layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        layer?.borderWidth = 1
         font = .monospacedSystemFont(ofSize: 12, weight: .semibold)
         target = self
         action = #selector(beginRecording)
@@ -86,11 +86,27 @@ final class ShortcutRecorderButton: NSButton {
         updateTitle()
     }
 
+    override func updateLayer() {
+        if isRecording {
+            layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.10).cgColor
+            layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.45).cgColor
+        } else {
+            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            layer?.borderColor = NSColor.separatorColor.cgColor
+        }
+    }
+
     private func updateTitle() {
         if isRecording {
             title = "Type Shortcut"
+            contentTintColor = NSColor.controlAccentColor
+        } else if let shortcut {
+            title = shortcut.displayString
+            contentTintColor = NSColor.labelColor
         } else {
-            title = shortcut?.displayString ?? "Record Shortcut"
+            title = "Record Shortcut"
+            contentTintColor = NSColor.tertiaryLabelColor
         }
+        needsDisplay = true
     }
 }

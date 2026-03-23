@@ -5,11 +5,9 @@ struct HeyBarApp {
     static func main() {
         let application = NSApplication.shared
         let delegate = AppDelegate()
-        let environment = ProcessInfo.processInfo.environment
-        let arguments = ProcessInfo.processInfo.arguments
-        let isSettingsHelper = environment["HEYBAR_SETTINGS_HELPER"] == "1" || arguments.contains("--settings-helper")
-
-        application.setActivationPolicy(isSettingsHelper ? .regular : .accessory)
+        // Both main app and helper start as accessory (no Dock icon).
+        // The helper switches to .regular when the Settings window opens.
+        application.setActivationPolicy(.accessory)
         application.delegate = delegate
         application.run()
     }

@@ -28,7 +28,7 @@ enum SettingsLayout {
     static let backgroundTintOrbRadius: CGFloat = 260
     static let backgroundCloseOrbRadius: CGFloat = 240
     // General sidebar width used in GeneralSettingsPage feature list
-    static let generalSidebarWidth: CGFloat = 240
+    static let generalSidebarWidth: CGFloat = 300
     // Animation durations
     static let selectionDuration: TimeInterval = 0.12
     static let themeChangeDuration: TimeInterval = 0.16
@@ -40,7 +40,6 @@ final class SettingsWindowController: NSWindowController {
     private let hostingController: NSHostingController<SettingsView>
     var onWindowClose: (() -> Void)?
     private var cmdWMonitor: Any?
-    nonisolated(unsafe) private var appActivationObserver: NSObjectProtocol?
 
     init(model: AppModel) {
         self.model = model
@@ -86,40 +85,9 @@ final class SettingsWindowController: NSWindowController {
             }
         }
 
-        // When another app gains focus because its window closed (not because
-        // the user explicitly clicked it), bring the Settings window back to front.
-        var otherWindowWillClose = false
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            guard let closingWindow = notification.object as? NSWindow,
-                  closingWindow !== self?.window else { return }
-            otherWindowWillClose = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                otherWindowWillClose = false
-            }
-        }
-
-        appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard otherWindowWillClose,
-                  let self,
-                  let w = self.window, w.isVisible else { return }
-            NSApp.activate(ignoringOtherApps: true)
-            w.makeKeyAndOrderFront(nil)
-        }
     }
 
-    deinit {
-        if let appActivationObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver)
-        }
-    }
+    deinit { }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
@@ -140,16 +108,27 @@ final class SettingsWindowController: NSWindowController {
         if window.isMiniaturized {
             window.deminiaturize(nil)
         }
-        // First pass: set a reasonable frame before the window is shown
-        // so there is no visible flash at the wrong position.
+
+        if window.isVisible {
+            // Already on screen — just bring to front.
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        // First show: position off-screen so SwiftUI can lay out content
+        // without a visible flash, then move to the correct position.
+        window.alphaValue = 0
         centerWindowOnActiveScreen(window)
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-        // Second pass: correct any frame adjustment that macOS or SwiftUI
-        // applied when laying out the content after the window appeared.
+        window.orderFront(nil)
+
+        // Give SwiftUI one layout pass, then reveal.
         DispatchQueue.main.async { [weak self] in
             guard let window = self?.window else { return }
             self?.centerWindowOnActiveScreen(window)
+            window.alphaValue = 1
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
@@ -279,3 +258,4 @@ extension View {
         foregroundStyle(Color(nsColor: theme.settingsErrorTextColor))
     }
 }
+

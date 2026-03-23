@@ -433,6 +433,7 @@ struct SettingsSectionCard<Content: View>: View {
     let statusText: String?
     let tone: SettingsCardTone
     let iconName: String?
+    let showSeparator: Bool
     @Environment(\.heyBarTheme) private var theme
     @State private var isHovered = false
     @ViewBuilder var content: Content
@@ -443,6 +444,7 @@ struct SettingsSectionCard<Content: View>: View {
         statusText: String? = nil,
         tone: SettingsCardTone = .neutral,
         iconName: String? = nil,
+        showSeparator: Bool = true,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -450,62 +452,65 @@ struct SettingsSectionCard<Content: View>: View {
         self.statusText = statusText
         self.tone = tone
         self.iconName = iconName
+        self.showSeparator = showSeparator
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsLayout.cardSpacing) {
-            HStack(alignment: .top, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    if let iconName {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(tone.fillColor(theme: theme).opacity(theme.preferredColorScheme == .dark ? 0.72 : 1))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(tone.textColor(theme: theme).opacity(0.14), lineWidth: 1)
-                                )
-                            Image(systemName: iconName)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(tone.textColor(theme: theme))
-                        }
-                        .frame(width: 30, height: 30)
+            HStack(alignment: .top, spacing: 12) {
+                if let iconName {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(tone.fillColor(theme: theme).opacity(theme.preferredColorScheme == .dark ? 0.72 : 1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(tone.textColor(theme: theme).opacity(0.14), lineWidth: 1)
+                            )
+                        Image(systemName: iconName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(tone.textColor(theme: theme))
                     }
+                    .frame(width: 30, height: 30)
+                }
 
-                    VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(title)
                             .font(Font(theme.settingsSectionTitleFont))
                             .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
 
-                        if let subtitle {
-                            Text(subtitle)
-                                .font(Font(theme.settingsBodyFont))
-                                .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
-                                .lineSpacing(2)
-                                .fixedSize(horizontal: false, vertical: true)
+                        if let statusText {
+                            Spacer(minLength: 6)
+                            Text(statusText.uppercased())
+                                .font(.system(size: 9, weight: .semibold))
+                                .tracking(0.8)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(tone.fillColor(theme: theme))
+                                )
+                                .foregroundStyle(tone.textColor(theme: theme))
+                                .fixedSize()
                         }
                     }
-                }
 
-                Spacer(minLength: 10)
-
-                if let statusText {
-                    Text(statusText.uppercased())
-                        .font(Font(theme.settingsLabelFont))
-                        .tracking(1.1)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(tone.fillColor(theme: theme))
-                        )
-                        .foregroundStyle(tone.textColor(theme: theme))
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(Font(theme.settingsBodyFont))
+                            .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
 
-            Rectangle()
-                .fill(Color(nsColor: theme.settingsSeparatorColor))
-                .frame(height: 1)
+            if showSeparator {
+                Rectangle()
+                    .fill(Color(nsColor: theme.settingsSeparatorColor))
+                    .frame(height: 1)
+            }
 
             VStack(alignment: .leading, spacing: 12) {
                 content

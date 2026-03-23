@@ -7,7 +7,7 @@ enum QuickControlsLayout {
     static let edgePadding: CGFloat = 8
     static let tileHeight: CGFloat = 92
     static let footerButtonHeight: CGFloat = 34
-    static let closeButtonSize: CGFloat = 26
+    static let closeButtonSize: CGFloat = 36
     static let logoBadgeSize: CGFloat = 36
     static let featureTileCornerRadius: CGFloat = 18
     static let backgroundCornerRadius: CGFloat = 22

@@ -46,19 +46,6 @@ struct CleanKeySettingsSection: View {
             if controller.isCleaning {
                 SettingsMiniValueRow(title: "Remaining", value: controller.remainingBadgeText)
                 SettingsMiniValueRow(title: "Unlock", value: "Press ESC 5 times")
-            } else if !controller.hasAccessibilityPermission {
-                SettingsHelpStateCard(
-                    title: "Accessibility permission required",
-                    message: "CleanKey mode needs Accessibility access before it can lock keyboard and mouse input.",
-                    iconName: "figure.wave.circle",
-                    tone: .attention,
-                    tips: [
-                        "Click Request Access to show the macOS permission prompt.",
-                        "If the prompt does not appear, open Accessibility settings manually."
-                    ]
-                )
-            } else {
-                SettingsInlineMessage(text: "Start CleanKey mode from here or from Quick Controls. The overlay unlocks automatically when the timer ends.", isError: false)
             }
 
             if controller.isCleaning {
@@ -133,18 +120,13 @@ struct KeepAwakeSettingsSection: View {
             tone: controller.isEnabled ? .positive : .neutral,
             iconName: "sparkles.tv"
         ) {
-            HStack {
-                Text("Mode")
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Picker("Mode", selection: modeBinding) {
-                    Text("Manual").tag(0)
-                    Text("Duration").tag(1)
-                    Text("Schedule").tag(2)
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 210)
+            Picker("Mode", selection: modeBinding) {
+                Text("Manual").tag(0)
+                Text("Duration").tag(1)
+                Text("Schedule").tag(2)
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
             if currentMode == 1 {
                 HStack {
@@ -156,6 +138,7 @@ struct KeepAwakeSettingsSection: View {
                             Text(controller.durationDescription(for: d)).tag(d)
                         }
                     }
+                    .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(maxWidth: 150)
                 }

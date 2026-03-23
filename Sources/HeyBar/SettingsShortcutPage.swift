@@ -26,58 +26,12 @@ struct ShortcutSettingsPage: View {
                 )
             }
 
-            SettingsSectionCard(
-                title: "Shortcut Matrix",
-                subtitle: "Global commands for HeyBar actions. Record a combination, then clear or replace it at any time.",
-                statusText: "\(configuredShortcutCount) Active",
-                tone: configuredShortcutCount == 0 ? .attention : .positive,
-                iconName: "command.square"
-            ) {
-                HStack(spacing: 10) {
-                    SettingsInfoPill(text: "Global")
-                    SettingsInfoPill(text: "Conflict Aware")
-                    SettingsInfoPill(text: "Editable")
-                }
-
-                SettingsInlineMessage(text: "Click a recorder, then press the key combination you want to use.", isError: false)
-
-                if let lastError = controller.lastError {
-                    SettingsInlineMessage(text: lastError, isError: true)
-                }
+            if let lastError = controller.lastError {
+                SettingsInlineMessage(text: lastError, isError: true)
             }
 
-            ShortcutSettingsSection(
-                title: "Session",
-                detail: "Primary control",
-                actions: [.keepAwake],
-                controller: controller
-            )
-
-            ShortcutSettingsSection(
-                title: "Cleaning",
-                detail: "Input lock mode",
-                actions: [.cleanKey],
-                controller: controller
-            )
-
-            ShortcutSettingsSection(
-                title: "Finder",
-                detail: "Visibility tools",
-                actions: [.showHiddenFiles, .showFileExtensions],
-                controller: controller
-            )
-
-            ShortcutSettingsSection(
-                title: "Display",
-                detail: "Screen and keyboard lighting",
-                actions: [.nightShift, .keyLight],
-                controller: controller
-            )
-
-            ShortcutSettingsSection(
-                title: "Automation",
-                detail: "Dock and menu bar actions",
-                actions: [.hideDock, .hideBar],
+            ShortcutGrid(
+                actions: ShortcutAction.allCases,
                 controller: controller
             )
         }
@@ -92,44 +46,42 @@ struct ShortcutSettingsPage: View {
     }
 }
 
-struct ShortcutSettingsSection: View {
-    let title: String
-    let detail: String
+struct ShortcutGrid: View {
     let actions: [ShortcutAction]
     @ObservedObject var controller: ShortcutController
-    @Environment(\.heyBarTheme) private var theme
+
+    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SettingsGroupHeader(title: title, detail: detail)
-
+        LazyVGrid(columns: columns, spacing: 12) {
             ForEach(actions) { action in
                 SettingsSectionCard(
                     title: action.title,
                     subtitle: action.categoryLabel,
-                    statusText: controller.shortcut(for: action) == nil ? "Unset" : "Ready",
                     tone: controller.shortcut(for: action) == nil ? .neutral : .positive,
-                    iconName: action.iconName
+                    iconName: action.iconName,
+                    showSeparator: false
                 ) {
-                    HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
                         if let shortcut = controller.shortcut(for: action) {
                             SettingsInfoPill(text: shortcut.displayString)
                         } else {
                             SettingsInfoPill(text: "No Shortcut")
                         }
 
-                        Spacer(minLength: 12)
+                        HStack(spacing: 8) {
+                            ShortcutRecorderField(shortcut: Binding(
+                                get: { controller.shortcut(for: action) },
+                                set: { controller.setShortcut($0, for: action) }
+                            ))
+                            .frame(height: SettingsLayout.shortcutRecorderHeight)
+                            .frame(maxWidth: .infinity)
 
-                        ShortcutRecorderField(shortcut: Binding(
-                            get: { controller.shortcut(for: action) },
-                            set: { controller.setShortcut($0, for: action) }
-                        ))
-                        .frame(width: SettingsLayout.shortcutRecorderWidth, height: SettingsLayout.shortcutRecorderHeight)
-
-                        Button("Clear") {
-                            controller.setShortcut(nil, for: action)
+                            Button("Clear") {
+                                controller.setShortcut(nil, for: action)
+                            }
+                            .buttonStyle(SettingsSecondaryButtonStyle())
                         }
-                        .buttonStyle(SettingsSecondaryButtonStyle())
                     }
                 }
             }

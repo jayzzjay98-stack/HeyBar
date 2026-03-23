@@ -236,6 +236,12 @@ final class FeatureTileButton: NSButton {
         if previousBadgeStyle != badgeStyle {
             animateStatusPulse()
         }
+
+        // Accessibility: announce current state to VoiceOver
+        let stateText = enabled ? (badgeStyle == .on ? "On" : "Off") : "Unavailable"
+        let badgeDesc = badgeText.isEmpty ? "" : ", \(badgeText)"
+        setAccessibilityLabel(titleField.stringValue)
+        setAccessibilityValue("\(stateText)\(badgeDesc)")
     }
 
     private func applyInteractionState(animated: Bool) {
@@ -258,7 +264,8 @@ final class FeatureTileButton: NSButton {
             self.badgeField.alphaValue = self.isHovered ? 1 : 0.96
         }
 
-        if animated {
+        let shouldAnimate = animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if shouldAnimate {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = QuickControlsLayout.panelShowDuration
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -270,6 +277,10 @@ final class FeatureTileButton: NSButton {
     }
 
     private func animatePress(scale: CGFloat) {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            layer?.transform = CATransform3DMakeScale(scale, scale, 1)
+            return
+        }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = QuickControlsLayout.tilePressDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -278,6 +289,7 @@ final class FeatureTileButton: NSButton {
     }
 
     private func animateStatusPulse() {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
         let animation = CABasicAnimation(keyPath: "transform.scale")
         animation.fromValue = 0.96
         animation.toValue = 1.0

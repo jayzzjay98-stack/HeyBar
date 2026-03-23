@@ -109,7 +109,9 @@ final class QuickControlsViewController: NSViewController {
         closeButton.target = self
         closeButton.action = #selector(closePanel)
         closeButton.wantsLayer = true
-        closeButton.layer?.cornerRadius = 13
+        closeButton.layer?.cornerRadius = QuickControlsLayout.closeButtonSize / 2
+        closeButton.setAccessibilityLabel("Close")
+        closeButton.setAccessibilityHelp("Close the Quick Controls panel")
         closeButton.widthAnchor.constraint(equalToConstant: QuickControlsLayout.closeButtonSize).isActive = true
         closeButton.heightAnchor.constraint(equalToConstant: QuickControlsLayout.closeButtonSize).isActive = true
     }
@@ -124,6 +126,8 @@ final class QuickControlsViewController: NSViewController {
         settingsButton.alignment = .center
         settingsButton.target = self
         settingsButton.action = #selector(openSettingsAction)
+        settingsButton.setAccessibilityLabel("Settings")
+        settingsButton.setAccessibilityHelp("Open HeyBar settings")
 
         quitButton.translatesAutoresizingMaskIntoConstraints = false
         quitButton.isBordered = false
@@ -134,6 +138,8 @@ final class QuickControlsViewController: NSViewController {
         quitButton.alignment = .center
         quitButton.target = self
         quitButton.action = #selector(quitApp)
+        quitButton.setAccessibilityLabel("Quit HeyBar")
+        quitButton.setAccessibilityHelp("Quit HeyBar completely")
     }
 
     private func setupToastView() {
@@ -516,6 +522,24 @@ final class QuickControlsViewController: NSViewController {
         toastLabel.stringValue = message
         toastView.layer?.removeAllAnimations()
 
+        // Announce to VoiceOver
+        NSAccessibility.post(
+            element: NSApp as Any,
+            notification: NSAccessibility.Notification(rawValue: "AXAnnouncementRequested"),
+            userInfo: [
+                .announcement: message as NSString,
+                .priority: NSAccessibilityPriorityLevel.high.rawValue as NSNumber
+            ]
+        )
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            toastView.alphaValue = 1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { [weak self] in
+                self?.toastView.alphaValue = 0
+            }
+            return
+        }
+
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = QuickControlsLayout.toastFadeInDuration
             toastView.animator().alphaValue = 1
@@ -552,6 +576,10 @@ final class QuickControlsViewController: NSViewController {
         onClose?()
     }
 
+    @objc override func cancelOperation(_ sender: Any?) {
+        closePanel()
+    }
+
     // MARK: - Theme
 
     private func applyTheme(_ theme: AppTheme) {
@@ -576,7 +604,8 @@ final class QuickControlsViewController: NSViewController {
         quitButton.image = quitIcon
         quitButton.contentTintColor = theme.closeTint
 
-        toastView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.72).cgColor
+        let isDark = theme.preferredColorScheme == .dark
+        toastView.layer?.backgroundColor = NSColor(white: isDark ? 0.12 : 0.08, alpha: 0.88).cgColor
         toastLabel.textColor = .white
         toastLabel.font = .systemFont(ofSize: 12, weight: .medium)
     }

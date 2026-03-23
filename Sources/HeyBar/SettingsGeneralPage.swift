@@ -1,12 +1,5 @@
 import SwiftUI
 
-// MARK: - Sidebar Selection
-
-private enum SidebarSelection: Hashable {
-    case feature(CustomizeFeature)
-    case panelLayout
-}
-
 // MARK: - Feature List
 
 private enum CustomizeFeature: String, CaseIterable, Identifiable {
@@ -20,6 +13,19 @@ private enum CustomizeFeature: String, CaseIterable, Identifiable {
     case hideBar        = "Hide Bar"
 
     var id: String { rawValue }
+
+    var tileID: TileID {
+        switch self {
+        case .keepAwake:      return .keepAwake
+        case .cleanKey:       return .cleanKey
+        case .nightShift:     return .nightShift
+        case .keyLight:       return .keyLight
+        case .hiddenFiles:    return .hiddenFiles
+        case .fileExtensions: return .fileExtensions
+        case .hideDock:       return .hideDock
+        case .hideBar:        return .hideBar
+        }
+    }
 
     var icon: String {
         switch self {
@@ -50,8 +56,14 @@ struct GeneralSettingsPage: View {
 
     @Environment(\.heyBarTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var selection: SidebarSelection? = .feature(.keepAwake)
+    @State private var selectedFeature: CustomizeFeature? = CustomizeFeature.allCases.first
     @State private var keyMonitor: Any?
+    @State private var orderedFeatures: [CustomizeFeature] = CustomizeFeature.allCases
+    @State private var panelVisibility: [TileID: Bool] = [:]
+    @State private var dragSourceIndex: Int? = nil
+    @State private var dragOffsetY: CGFloat = 0
+    @State private var dragTargetIndex: Int = 0
+    private let sidebarRowH: CGFloat = 52
 
     var body: some View {
         HStack(spacing: 0) {
@@ -65,6 +77,7 @@ struct GeneralSettingsPage: View {
             DispatchQueue.main.async {
                 refreshControllers()
             }
+            loadPanelState()
             guard keyMonitor == nil else { return }
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 guard event.keyCode == ArrowKey.down || event.keyCode == ArrowKey.up
@@ -86,74 +99,95 @@ struct GeneralSettingsPage: View {
     private var featureSidebar: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(CustomizeFeature.allCases) { feature in
-                        FeatureSidebarRow(
-                            feature: feature,
-                            isSelected: selection == .feature(feature),
-                            statusText: featureStatus(feature),
-                            isActive: featureIsActive(feature),
-                            toggleBinding: featureToggleBinding(feature),
-                            theme: theme
-                        ) {
-                            withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
-                                selection = .feature(feature)
-                            }
-                        }
-                    }
-
-                    Divider()
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 12)
-
-                    PanelLayoutSidebarRow(
-                        isSelected: selection == .panelLayout,
-                        theme: theme
-                    ) {
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
-                            selection = .panelLayout
-                        }
+                VStack(spacing: 0) {
+                    ForEach(Array(orderedFeatures.enumerated()), id: \.element) { idx, feature in
+                        makeSidebarRow(feature: feature, index: idx)
                     }
                 }
-                .padding(.vertical, 8)
             }
-            Divider()
-            activeCountFooter
         }
         .frame(width: SettingsLayout.generalSidebarWidth)
         .background(Color(nsColor: theme.settingsSidebarSurfaceColor))
     }
 
-    private var activeCountFooter: some View {
-        let activeCount = CustomizeFeature.allCases.filter { featureIsActive($0) }.count
-        let total = CustomizeFeature.allCases.count
-        return HStack(spacing: 5) {
-            Circle()
-                .fill(activeCount > 0
-                      ? Color(nsColor: theme.settingsTint)
-                      : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.25))
-                .frame(width: 5, height: 5)
-            Text("\(activeCount) of \(total) active")
-                .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.45))
-            Spacer()
+    @ViewBuilder
+    private func makeSidebarRow(feature: CustomizeFeature, index: Int) -> some View {
+        let isSrc = dragSourceIndex == index
+
+        FeatureSidebarRow(
+            feature: feature,
+            isSelected: selectedFeature == feature,
+            statusText: featureStatus(feature),
+            isActive: featureIsActive(feature),
+            toggleBinding: panelVisibilityBinding(for: feature),
+            theme: theme
+        )
+        .background(
+            selectedFeature == feature
+            ? Color(nsColor: theme.settingsTint).opacity(0.08)
+            : Color.clear
+        )
+        .opacity(isSrc ? 0.4 : 1.0)
+        .zIndex(isSrc ? 2 : 0)
+        .offset(y: isSrc ? dragOffsetY : sidebarItemOffset(for: index))
+        .animation(
+            isSrc ? nil : .interactiveSpring(response: 0.22, dampingFraction: 0.85),
+            value: dragTargetIndex
+        )
+        .gesture(
+            DragGesture(minimumDistance: 6)
+                .onChanged { value in
+                    if dragSourceIndex == nil { dragSourceIndex = index }
+                    if dragSourceIndex == index {
+                        dragOffsetY = value.translation.height
+                        let moved = Int((dragOffsetY / sidebarRowH).rounded())
+                        let newTarget = max(0, min(orderedFeatures.count - 1, index + moved))
+                        if newTarget != dragTargetIndex { dragTargetIndex = newTarget }
+                    }
+                }
+                .onEnded { _ in
+                    let src = dragSourceIndex ?? index
+                    let dst = dragTargetIndex
+                    if dst != src {
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            orderedFeatures.move(
+                                fromOffsets: IndexSet(integer: src),
+                                toOffset: dst > src ? dst + 1 : dst
+                            )
+                        }
+                        savePanelState()
+                    }
+                    dragSourceIndex = nil
+                    dragOffsetY = 0
+                }
+        )
+        .onTapGesture {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
+                selectedFeature = feature
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+    }
+
+    private func sidebarItemOffset(for index: Int) -> CGFloat {
+        guard let src = dragSourceIndex, src != dragTargetIndex else { return 0 }
+        let dst = dragTargetIndex
+        if src < dst {
+            if index > src && index <= dst { return -sidebarRowH }
+        } else {
+            if index < src && index >= dst { return sidebarRowH }
+        }
+        return 0
     }
 
     // MARK: Detail Panel
 
     @ViewBuilder
     private var detailPanel: some View {
-        switch selection {
-        case .feature(let feature):
+        if let feature = selectedFeature {
             SettingsPageScroll {
                 featureDetailContent(feature)
             }
-        case .panelLayout:
-            PanelSettingsPage()
-        case nil:
+        } else {
             VStack(spacing: 10) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 32, weight: .light))
@@ -182,22 +216,46 @@ struct GeneralSettingsPage: View {
 
     // MARK: Helpers
 
+    private func loadPanelState() {
+        let store = TileOrderStore.shared
+        let tileIDToFeature: [TileID: CustomizeFeature] = Dictionary(
+            uniqueKeysWithValues: CustomizeFeature.allCases.map { ($0.tileID, $0) }
+        )
+        let loaded = store.order.compactMap { tileIDToFeature[$0] }
+        orderedFeatures = loaded.isEmpty ? CustomizeFeature.allCases : loaded
+        panelVisibility = Dictionary(
+            uniqueKeysWithValues: store.order.map { ($0, !store.hidden.contains($0)) }
+        )
+    }
+
+    private func savePanelState() {
+        let store = TileOrderStore.shared
+        store.setOrder(orderedFeatures.map(\.tileID))
+        for feature in orderedFeatures {
+            store.setHidden(feature.tileID, !(panelVisibility[feature.tileID] ?? true))
+        }
+    }
+
+    private func panelVisibilityBinding(for feature: CustomizeFeature) -> Binding<Bool> {
+        Binding(
+            get: { panelVisibility[feature.tileID] ?? true },
+            set: { newVal in
+                panelVisibility[feature.tileID] = newVal
+                savePanelState()
+            }
+        )
+    }
+
     private func moveSelection(by offset: Int) {
-        let all = CustomizeFeature.allCases
-        if case .feature(let current) = selection,
+        let all = orderedFeatures
+        if let current = selectedFeature,
            let idx = all.firstIndex(of: current) {
             let newIdx = max(0, min(all.count - 1, idx + offset))
             withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
-                selection = .feature(all[newIdx])
+                selectedFeature = all[newIdx]
             }
-        } else if selection == .panelLayout && offset < 0 {
-            withAnimation(reduceMotion ? nil : .easeOut(duration: SettingsLayout.selectionDuration)) {
-                selection = .feature(all[all.count - 1])
-            }
-        } else if case .feature(_) = selection, offset > 0 {
-            // reached end of features — could move to panelLayout
         } else {
-            selection = .feature(all.first ?? .keepAwake)
+            selectedFeature = all.first ?? CustomizeFeature.allCases[0]
         }
     }
 
@@ -280,131 +338,60 @@ private struct FeatureSidebarRow: View {
     let isActive: Bool
     let toggleBinding: Binding<Bool>
     let theme: AppTheme
-    let action: () -> Void
-
-    @State private var isHovered = false
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            Button(action: action) {
-                HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(isSelected ? Color(nsColor: theme.settingsTint) : .clear)
-                        .frame(width: 3, height: 34)
+        HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(isSelected ? Color(nsColor: theme.settingsTint) : .clear)
+                .frame(width: 3, height: 36)
 
-                    Image(systemName: feature.icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(
-                            isSelected
-                            ? Color(nsColor: theme.settingsTint)
-                            : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.75)
-                        )
-                        .frame(width: 30, height: 30)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(
-                                    isSelected
-                                    ? Color(nsColor: theme.settingsTint).opacity(0.15)
-                                    : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.08)
-                                )
-                        )
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(feature.rawValue)
-                            .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                            .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
-                            .lineLimit(1)
-                        Text(statusText)
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundStyle(
-                                isActive
-                                ? Color(nsColor: theme.settingsTint)
-                                : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.4)
-                            )
-                    }
-
-                    Spacer()
-                    Color.clear.frame(width: 40)
-                }
-                .frame(height: 48)
-                .background(
+            Image(systemName: feature.icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(
                     isSelected
-                    ? Color(nsColor: theme.settingsTint).opacity(0.08)
-                    : isHovered
-                        ? Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.05)
-                        : Color.clear
+                    ? Color(nsColor: theme.settingsTint)
+                    : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.75)
                 )
-                .contentShape(Rectangle())
+                .frame(width: 30, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(
+                            isSelected
+                            ? Color(nsColor: theme.settingsTint).opacity(0.15)
+                            : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.08)
+                        )
+                )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(feature.rawValue)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
+                    .lineLimit(1)
+                Text(statusText)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(
+                        isActive
+                        ? Color(nsColor: theme.settingsTint)
+                        : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.4)
+                    )
             }
-            .buttonStyle(.plain)
+
+            Spacer()
 
             Toggle("", isOn: toggleBinding)
                 .toggleStyle(.switch)
                 .labelsHidden()
                 .scaleEffect(0.75)
-                .padding(.trailing, 10)
+                .frame(width: 36)
+
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.3))
+                .frame(width: 20)
+                .padding(.trailing, 8)
         }
-        .onHover { isHovered = $0 }
+        .frame(height: 52)
+        .contentShape(Rectangle())
     }
 }
 
-// MARK: - Panel Layout Sidebar Row
-
-private struct PanelLayoutSidebarRow: View {
-    let isSelected: Bool
-    let theme: AppTheme
-    let action: () -> Void
-
-    @State private var isHovered = false
-    @State private var visibleCount: Int = TileOrderStore.shared.order.filter { !TileOrderStore.shared.hidden.contains($0) }.count
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(isSelected ? Color(nsColor: theme.settingsTint) : .clear)
-                    .frame(width: 3, height: 34)
-
-                Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(
-                        isSelected
-                        ? Color(nsColor: theme.settingsTint)
-                        : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.75)
-                    )
-                    .frame(width: 30, height: 30)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(
-                                isSelected
-                                ? Color(nsColor: theme.settingsTint).opacity(0.15)
-                                : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.08)
-                            )
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Panel Layout")
-                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                        .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
-                        .lineLimit(1)
-                    Text("\(visibleCount) of \(TileID.allCases.count) visible")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.4))
-                }
-
-                Spacer()
-            }
-            .frame(height: 48)
-            .background(
-                isSelected
-                ? Color(nsColor: theme.settingsTint).opacity(0.08)
-                : isHovered
-                    ? Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.05)
-                    : Color.clear
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-    }
-}
