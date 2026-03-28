@@ -117,14 +117,14 @@ struct AppTheme: Identifiable, Equatable {
     var settingsWindowGradientColors: [NSColor] {
         if preferredColorScheme == .dark {
             return [
-                blended(settingsTint, with: ThemeCatalog.hex(0x0D1211), amount: 0.82),
-                blended(panelGradient.last ?? closeFill, with: ThemeCatalog.hex(0x101715), amount: 0.78)
+                blended(settingsTint, with: ThemeCatalog.hex(0x0D1211), amount: 0.70),
+                blended(panelGradient.last ?? closeFill, with: ThemeCatalog.hex(0x101715), amount: 0.62)
             ]
         }
 
         return [
-            blended(settingsTint, with: .white, amount: 0.84),
-            blended(closeFill, with: ThemeCatalog.hex(0xEEF3F1), amount: 0.34)
+            blended(settingsTint, with: .white, amount: 0.72),
+            blended(closeFill, with: ThemeCatalog.hex(0xEEF3F1), amount: 0.22)
         ]
     }
 

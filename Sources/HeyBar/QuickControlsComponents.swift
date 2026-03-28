@@ -67,7 +67,7 @@ final class FeatureTileButton: NSButton {
         badgeField.maximumNumberOfLines = 1
 
         captionField.translatesAutoresizingMaskIntoConstraints = false
-        captionField.stringValue = caption.uppercased()
+        captionField.stringValue = caption
         captionField.alignment = .center
 
         symbolView.translatesAutoresizingMaskIntoConstraints = false
@@ -94,7 +94,7 @@ final class FeatureTileButton: NSButton {
 
             badgeBackgroundView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -QuickControlsLayout.badgeInsetTrailing),
             badgeBackgroundView.topAnchor.constraint(equalTo: topAnchor, constant: QuickControlsLayout.badgeInsetTop),
-            badgeBackgroundView.widthAnchor.constraint(greaterThanOrEqualToConstant: 46),
+            badgeBackgroundView.widthAnchor.constraint(greaterThanOrEqualToConstant: 34),
             badgeBackgroundView.heightAnchor.constraint(equalToConstant: 22),
 
             badgeField.centerXAnchor.constraint(equalTo: badgeBackgroundView.centerXAnchor),
@@ -202,7 +202,7 @@ final class FeatureTileButton: NSButton {
         lastCaptionOverride = captionOverride
         titleField.textColor = foreground
         captionField.textColor = foreground.withAlphaComponent(0.8)
-        captionField.stringValue = (captionOverride ?? originalCaption).uppercased()
+        captionField.stringValue = captionOverride ?? originalCaption
 
         if let symbolName, let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: titleField.stringValue) {
             symbolView.image = image
@@ -344,14 +344,13 @@ final class GradientPanelBackgroundView: NSView {
     }
 
     func apply(theme: AppTheme) {
-        layer?.backgroundColor = theme.settingsContentSurfaceColor.withAlphaComponent(1).cgColor
-        gradientLayer.colors = theme.settingsWindowGradientColors
-            .map { $0.withAlphaComponent(1).cgColor }
+        layer?.backgroundColor = (theme.panelGradient.first ?? theme.settingsContentSurfaceColor).cgColor
+        gradientLayer.colors = theme.panelGradient.map(\.cgColor)
         glossLayer.colors = [
-            theme.settingsAccentSoftFill.withAlphaComponent(theme.preferredColorScheme == .dark ? 0.08 : 0.16).cgColor,
+            NSColor.white.withAlphaComponent(theme.preferredColorScheme == .dark ? 0.06 : 0.22).cgColor,
             NSColor.clear.cgColor
         ]
-        borderLayer.borderColor = theme.settingsSidebarBorderColor.cgColor
+        borderLayer.borderColor = theme.panelBorder.cgColor
     }
 }
 

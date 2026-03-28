@@ -67,7 +67,9 @@ struct ThemesSettingsPage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns = [
-        GridItem(.adaptive(minimum: SettingsLayout.themeGridMinimum, maximum: SettingsLayout.themeGridMaximum), spacing: SettingsLayout.detailPadding)
+        GridItem(.flexible(), spacing: SettingsLayout.detailPadding),
+        GridItem(.flexible(), spacing: SettingsLayout.detailPadding),
+        GridItem(.flexible(), spacing: SettingsLayout.detailPadding)
     ]
 
     var body: some View {
@@ -155,9 +157,8 @@ struct AboutSettingsPage: View {
                         }
                     } label: {
                         Label("Support on GitHub", systemImage: "cup.and.saucer.fill")
-                            .font(.system(size: 13, weight: .medium))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(SettingsSecondaryButtonStyle())
                 }
             }
         }
@@ -193,9 +194,8 @@ struct AboutSettingsPage: View {
                 updater.checkForUpdates()
             } label: {
                 Label("Check for Updates", systemImage: "arrow.clockwise")
-                    .font(.system(size: 13, weight: .medium))
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(SettingsSecondaryButtonStyle())
 
         case .checking:
             HStack(spacing: 8) {
@@ -219,10 +219,8 @@ struct AboutSettingsPage: View {
                     updater.resetToIdle()
                 } label: {
                     Text("Check Again")
-                        .font(.system(size: 12))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(SettingsSecondaryButtonStyle())
             }
 
         case .available(let version, let downloadURL):
@@ -234,9 +232,8 @@ struct AboutSettingsPage: View {
                     updater.startDownload(version: version, downloadURL: downloadURL)
                 } label: {
                     Label("Download Update", systemImage: "arrow.down.circle")
-                        .font(.system(size: 13, weight: .medium))
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(SettingsPrimaryButtonStyle())
             }
 
         case .downloading:
@@ -260,9 +257,8 @@ struct AboutSettingsPage: View {
                     updater.installDownloaded(version: version, zipURL: zipURL)
                 } label: {
                     Label("Install & Relaunch", systemImage: "arrow.clockwise.circle.fill")
-                        .font(.system(size: 13, weight: .medium))
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(SettingsPrimaryButtonStyle())
             }
 
         case .installing:

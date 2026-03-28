@@ -340,58 +340,65 @@ private struct FeatureSidebarRow: View {
     let theme: AppTheme
 
     var body: some View {
-        HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(isSelected ? Color(nsColor: theme.settingsTint) : .clear)
-                .frame(width: 3, height: 36)
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(isSelected ? Color(nsColor: theme.settingsTint) : .clear)
+                    .frame(width: 3, height: 36)
 
-            Image(systemName: feature.icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(
-                    isSelected
-                    ? Color(nsColor: theme.settingsTint)
-                    : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.75)
-                )
-                .frame(width: 30, height: 30)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(
-                            isSelected
-                            ? Color(nsColor: theme.settingsTint).opacity(0.15)
-                            : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.08)
-                        )
-                )
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(feature.rawValue)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
-                    .lineLimit(1)
-                Text(statusText)
-                    .font(.system(size: 10.5, weight: .medium))
+                Image(systemName: feature.icon)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(
-                        isActive
+                        isSelected
                         ? Color(nsColor: theme.settingsTint)
-                        : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.4)
+                        : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.75)
                     )
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                isSelected
+                                ? Color(nsColor: theme.settingsTint).opacity(0.15)
+                                : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.08)
+                            )
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(feature.rawValue)
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                        .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
+                        .lineLimit(1)
+                    Text(statusText)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(
+                            isActive
+                            ? Color(nsColor: theme.settingsTint)
+                            : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.4)
+                        )
+                }
+
+                Spacer()
+
+                Toggle("", isOn: toggleBinding)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .scaleEffect(0.75)
+                    .frame(width: 36)
+
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.3))
+                    .frame(width: 20)
+                    .padding(.trailing, 8)
             }
+            .frame(height: 52)
+            .contentShape(Rectangle())
 
-            Spacer()
-
-            Toggle("", isOn: toggleBinding)
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .scaleEffect(0.75)
-                .frame(width: 36)
-
-            Image(systemName: "line.3.horizontal")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.3))
-                .frame(width: 20)
-                .padding(.trailing, 8)
+            Rectangle()
+                .fill(Color(nsColor: theme.settingsSeparatorColor))
+                .frame(height: 1)
+                .padding(.leading, 46)
         }
-        .frame(height: 52)
-        .contentShape(Rectangle())
     }
 }
 

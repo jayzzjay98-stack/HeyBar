@@ -115,7 +115,7 @@ struct SettingsBrandLockup: View {
                 Text("HeyBar")
                     .font(Font(theme.settingsSectionTitleFont))
                     .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
-                Text("Settings Studio")
+                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
                     .font(Font(theme.settingsBodyFont))
                     .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
             }
@@ -293,9 +293,8 @@ struct SettingsPageHeader: View {
             Spacer(minLength: 12)
 
             if let statusText {
-                Text(statusText.uppercased())
+                Text(statusText)
                     .font(Font(theme.settingsLabelFont))
-                    .tracking(1.2)
                     .padding(.horizontal, 11)
                     .padding(.vertical, 7)
                     .background(
@@ -325,7 +324,7 @@ struct SettingsGroupHeader: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
                 .font(Font(theme.settingsLabelFont))
-                .tracking(1.6)
+                .tracking(0.8)
                 .textCase(.uppercase)
                 .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.84))
 
@@ -393,9 +392,9 @@ enum SettingsCardTone {
         case .positive, .attention:
             return textColor(theme: theme).opacity(0.18)
         case .neutral:
-            return Color(nsColor: theme.panelBorder).opacity(0.12)
+            return Color(nsColor: theme.settingsSidebarBorderColor)
         case .inactive:
-            return Color(nsColor: theme.panelBorder).opacity(0.08)
+            return Color(nsColor: theme.settingsSidebarBorderColor).opacity(0.72)
         }
     }
 }
@@ -482,9 +481,8 @@ struct SettingsSectionCard<Content: View>: View {
 
                         if let statusText {
                             Spacer(minLength: 6)
-                            Text(statusText.uppercased())
+                            Text(statusText)
                                 .font(.system(size: 9, weight: .semibold))
-                                .tracking(0.8)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
                                 .background(
@@ -754,7 +752,7 @@ struct ThemePreviewCard: View {
                         .fill(theme.swiftUIPanelGradient)
                         .frame(height: SettingsLayout.themeCardHeight)
 
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: theme.symbolName)
                                 .font(.system(size: 16, weight: .bold))
@@ -779,15 +777,14 @@ struct ThemePreviewCard: View {
                             .foregroundStyle(Color(nsColor: theme.titleColor))
 
                         Text(theme.fontPairLabel)
-                            .font(font(theme.cardFontName, size: 10.5, fallback: .system(size: 10.5, weight: .semibold)))
+                            .font(font(theme.cardFontName, size: 9.5, fallback: .system(size: 9.5, weight: .semibold)))
                             .foregroundStyle(Color(nsColor: theme.bodyColor).opacity(0.92))
+                            .lineLimit(2)
 
                         HStack(spacing: 10) {
                             ThemeMiniTile(theme: theme, title: "Keep Awake")
                             ThemeMiniTile(theme: theme, title: "Key Light", alternate: true)
                         }
-
-                        ThemeSurfaceStrip(theme: theme)
                     }
                     .padding(14)
                 }
@@ -852,9 +849,9 @@ struct ThemeSurfaceStrip: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            ThemeSurfaceDot(label: "Accent", color: Color(nsColor: theme.settingsTint))
-            ThemeSurfaceDot(label: "Shell", color: Color(nsColor: theme.settingsFill))
-            ThemeSurfaceDot(label: "Panel", color: Color(nsColor: theme.closeFill))
+            ThemeSurfaceDot(label: "Accent", color: Color(nsColor: theme.settingsTint), theme: theme)
+            ThemeSurfaceDot(label: "Shell", color: Color(nsColor: theme.settingsFill), theme: theme)
+            ThemeSurfaceDot(label: "Panel", color: Color(nsColor: theme.closeFill), theme: theme)
         }
     }
 }
@@ -862,18 +859,20 @@ struct ThemeSurfaceStrip: View {
 struct ThemeSurfaceDot: View {
     let label: String
     let color: Color
+    let theme: AppTheme
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Circle()
                 .fill(color)
-                .frame(width: 8, height: 8)
+                .frame(width: 7, height: 7)
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 9, weight: .semibold))
+                .lineLimit(1)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color.white.opacity(0.14))
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .background(Color(nsColor: theme.titleColor).opacity(0.12))
         .clipShape(Capsule())
     }
 }
@@ -892,23 +891,13 @@ struct ThemeMiniTile: View {
                     endPoint: .bottomTrailing
                 )
             )
-            .overlay(alignment: .topTrailing) {
-                Text("ON")
-                    .font(.system(size: 9, weight: .bold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(nsColor: theme.badgeOnFill))
-                    .foregroundStyle(Color(nsColor: theme.badgeOnText))
-                    .clipShape(Capsule())
-                    .padding(10)
-            }
             .overlay(alignment: .bottomLeading) {
                 Text(title)
                     .font(font(theme.cardFontName, size: 11, fallback: .system(size: 11, weight: .bold)))
                     .foregroundStyle(Color(nsColor: theme.tileForegroundColor(alternate: alternate)))
                     .padding(10)
             }
-            .frame(height: 72)
+            .frame(height: 54)
     }
 
     private func font(_ name: String, size: CGFloat, fallback: Font) -> Font {

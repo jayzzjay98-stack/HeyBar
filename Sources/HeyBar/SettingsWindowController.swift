@@ -5,7 +5,7 @@ enum SettingsLayout {
     static let windowSize = NSSize(width: 1004, height: 700)
     static let minimumWindowSize = NSSize(width: 960, height: 660)
     static let detailPadding: CGFloat = 16
-    static let themeCardHeight: CGFloat = 180
+    static let themeCardHeight: CGFloat = 136
     static let themeGridMinimum: CGFloat = 210
     static let themeGridMaximum: CGFloat = 240
     static let contentPadding: CGFloat = 24
