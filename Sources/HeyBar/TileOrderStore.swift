@@ -1,8 +1,8 @@
 import Foundation
 
 enum TileID: String, CaseIterable {
-    case keepAwake, hiddenFiles, fileExtensions
-    case keyLight, nightShift, hideDock, hideBar, cleanKey
+        case keepAwake, hiddenFiles, fileExtensions
+    case keyLight, nightShift, hideDock, hideBar, cleanKey, showDesktop
 }
 
 @MainActor

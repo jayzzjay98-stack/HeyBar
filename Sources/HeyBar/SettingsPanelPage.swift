@@ -19,6 +19,7 @@ struct PanelSettingsPage: View {
             case .hideDock:       return "Hide Dock"
             case .hideBar:        return "Hide Bar"
             case .cleanKey:       return "CleanKey"
+            case .showDesktop:    return "Show Desktop"
             }
         }
 
@@ -32,6 +33,7 @@ struct PanelSettingsPage: View {
             case .hideDock:       return "dock.rectangle"
             case .hideBar:        return "menubar.rectangle"
             case .cleanKey:       return "sparkles"
+            case .showDesktop:    return "macwindow.badge.minus"
             }
         }
     }

@@ -11,6 +11,7 @@ private enum CustomizeFeature: String, CaseIterable, Identifiable {
     case fileExtensions = "File Extensions"
     case hideDock       = "Hide Dock"
     case hideBar        = "Hide Bar"
+    case showDesktop    = "Show Desktop"
 
     var id: String { rawValue }
 
@@ -24,6 +25,7 @@ private enum CustomizeFeature: String, CaseIterable, Identifiable {
         case .fileExtensions: return .fileExtensions
         case .hideDock:       return .hideDock
         case .hideBar:        return .hideBar
+        case .showDesktop:    return .showDesktop
         }
     }
 
@@ -37,6 +39,7 @@ private enum CustomizeFeature: String, CaseIterable, Identifiable {
         case .fileExtensions: return "doc.badge.gearshape"
         case .hideDock:       return "dock.rectangle"
         case .hideBar:        return "menubar.rectangle"
+        case .showDesktop:    return "macwindow.badge.minus"
         }
     }
 }
@@ -211,6 +214,7 @@ struct GeneralSettingsPage: View {
         case .fileExtensions: ShowFileExtensionsSettingsSection(controller: model.fileExtensions)
         case .hideDock:       HideDockSettingsSection(controller: model.hideDock)
         case .hideBar:        HideBarSettingsSection(controller: model.hideBar)
+        case .showDesktop:    ShowDesktopSettingsSection(controller: model.showDesktop)
         }
     }
 
@@ -269,6 +273,7 @@ struct GeneralSettingsPage: View {
         case .fileExtensions: return model.fileExtensions.isEnabled ? "Visible" : "Hidden"
         case .hideDock:       return model.hideDock.isEnabled ? "On" : "Off"
         case .hideBar:        return model.hideBar.isEnabled ? "On" : "Off"
+        case .showDesktop:    return model.showDesktop.isEnabled ? "On" : "Off"
         }
     }
 
@@ -282,6 +287,7 @@ struct GeneralSettingsPage: View {
         case .fileExtensions: return model.fileExtensions.isEnabled
         case .hideDock:       return model.hideDock.isEnabled
         case .hideBar:        return model.hideBar.isEnabled
+        case .showDesktop:    return model.showDesktop.isEnabled
         }
     }
 
@@ -315,6 +321,9 @@ struct GeneralSettingsPage: View {
         case .hideBar:
             let c = model.hideBar
             return Binding(get: { c.isEnabled }, set: { c.setEnabled($0) })
+        case .showDesktop:
+            let c = model.showDesktop
+            return Binding(get: { c.isEnabled }, set: { newVal in if newVal != c.isEnabled { c.toggle() } })
         }
     }
 

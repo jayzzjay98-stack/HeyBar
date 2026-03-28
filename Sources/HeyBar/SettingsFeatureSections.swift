@@ -390,6 +390,29 @@ struct HideDockSettingsSection: View {
     }
 }
 
+struct ShowDesktopSettingsSection: View {
+    @ObservedObject var controller: ShowDesktopController
+    @Environment(\.heyBarTheme) private var theme
+
+    var body: some View {
+        SettingsSectionCard(
+            title: "Show Desktop",
+            subtitle: "Hide all open app windows to reveal the desktop. Toggle again to restore them.",
+            statusText: controller.isEnabled ? "On" : "Off",
+            tone: controller.isEnabled ? .positive : .neutral,
+            iconName: "macwindow.badge.minus"
+        ) {
+            Toggle("Hide all windows", isOn: Binding(
+                get: { controller.isEnabled },
+                set: { newVal in if newVal != controller.isEnabled { controller.toggle() } }
+            ))
+            .toggleStyle(.switch)
+
+            SettingsInlineMessage(text: "Only hides windows from regular apps. HeyBar and the menu bar remain visible.", isError: false)
+        }
+    }
+}
+
 struct HideBarSettingsSection: View {
     @ObservedObject var controller: HideBarController
     @Environment(\.heyBarTheme) private var theme

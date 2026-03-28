@@ -2,6 +2,8 @@ import Foundation
 
 @MainActor
 final class ShortcutController: ObservableObject {
+    static let didChangeNotification = Notification.Name("com.gravity.heybar.shortcutsDidChange")
+
     @Published private(set) var lastError: String?
 
     private let hotKeyManager: HotKeyManaging
@@ -44,6 +46,12 @@ final class ShortcutController: ObservableObject {
         case .success:
             store.persistShortcut(shortcut, for: action)
             duplicateShortcuts.keys.forEach { store.persistShortcut(nil, for: $0) }
+            DistributedNotificationCenter.default().postNotificationName(
+                ShortcutController.didChangeNotification,
+                object: Bundle.main.bundleIdentifier,
+                userInfo: nil,
+                deliverImmediately: true
+            )
             let clearedDuplicates = duplicateShortcuts.keys.map(\.rawValue).joined(separator: ", ")
             HeyBarDiagnostics.debug(
                 HeyBarLog.shortcuts,
@@ -80,6 +88,17 @@ final class ShortcutController: ObservableObject {
     private func clearShortcut(for action: ShortcutAction) {
         hotKeyManager.unregister(for: action)
         store.persistShortcut(nil, for: action)
+        DistributedNotificationCenter.default().postNotificationName(
+            ShortcutController.didChangeNotification,
+            object: Bundle.main.bundleIdentifier,
+            userInfo: nil,
+            deliverImmediately: true
+        )
+    }
+
+    func reloadFromDefaults() {
+        ShortcutAction.allCases.forEach { hotKeyManager.unregister(for: $0) }
+        restoreSavedShortcuts()
     }
 
     private func duplicateShortcuts(

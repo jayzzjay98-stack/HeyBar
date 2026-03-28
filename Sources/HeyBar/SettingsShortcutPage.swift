@@ -108,6 +108,8 @@ private extension ShortcutAction {
             return "dock.rectangle"
         case .hideBar:
             return "menubar.rectangle"
+        case .showDesktop:
+            return "macwindow.badge.minus"
         }
     }
 
@@ -123,6 +125,8 @@ private extension ShortcutAction {
             return "Display Controls"
         case .hideDock, .hideBar:
             return "Automation"
+        case .showDesktop:
+            return "Desktop"
         }
     }
 }

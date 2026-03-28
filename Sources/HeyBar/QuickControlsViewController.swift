@@ -39,7 +39,8 @@ final class QuickControlsViewController: NSViewController {
         .nightShift: FeatureTileButton(title: "Night Shift", symbolName: "moon.stars.fill", caption: "Display"),
         .hideDock: FeatureTileButton(title: "Hide Dock", symbolName: "dock.rectangle", caption: "Automation"),
         .hideBar: FeatureTileButton(title: "Hide Bar", symbolName: "menubar.rectangle", caption: "Automation"),
-        .cleanKey: FeatureTileButton(title: "CleanKey", symbolName: "sparkles", caption: "Apps")
+        .cleanKey: FeatureTileButton(title: "CleanKey", symbolName: "sparkles", caption: "Apps"),
+        .showDesktop: FeatureTileButton(title: "Show Desktop", symbolName: "macwindow.badge.minus", caption: "Desktop")
     ]
 
     // Content stack (stored so we can add/remove tile rows)
@@ -245,7 +246,10 @@ final class QuickControlsViewController: NSViewController {
             if let right = right, let leftBtn = allTileButtons[left], let rightBtn = allTileButtons[right] {
                 buttons = [leftBtn, rightBtn]
             } else if let leftBtn = allTileButtons[left] {
-                buttons = [leftBtn]
+                // Single tile: add transparent spacer on the left so the tile sits on the right
+                let spacer = NSView()
+                spacer.translatesAutoresizingMaskIntoConstraints = false
+                buttons = [spacer, leftBtn]
             } else {
                 i += 2
                 continue
@@ -426,6 +430,13 @@ final class QuickControlsViewController: NSViewController {
                 symbolName: model.cleanKey.isCleaning ? "lock.fill" : "sparkles",
                 captionOverride: shortcutLabel(for: .cleanKey) ?? "Cleaning"
             )
+
+        case .showDesktop:
+            let desktopOn = model.showDesktop.isEnabled
+            applyTileState(.standard(isOn: desktopOn, alternate: true), to: button, theme: theme,
+                symbolName: desktopOn ? "macwindow.badge.minus" : "macwindow.badge.minus",
+                captionOverride: shortcutLabel(for: .showDesktop)
+            )
         }
     }
 
@@ -524,6 +535,12 @@ final class QuickControlsViewController: NSViewController {
         } else {
             showToast(model.hideBar.isEnabled ? "Hide Bar — On" : "Hide Bar — Off")
         }
+    }
+
+    @objc private func toggleShowDesktop() {
+        model.toggleShowDesktop()
+        refresh()
+        showToast(model.showDesktop.isEnabled ? "Show Desktop — On" : "Show Desktop — Off")
     }
 
     @objc private func openCleanKey() {
@@ -648,7 +665,8 @@ final class QuickControlsViewController: NSViewController {
             .nightShift: #selector(toggleNightShift),
             .hideDock: #selector(toggleHideDock),
             .hideBar: #selector(toggleHideBar),
-            .cleanKey: #selector(openCleanKey)
+            .cleanKey: #selector(openCleanKey),
+            .showDesktop: #selector(toggleShowDesktop)
         ]
 
         for (id, selector) in actionMap {

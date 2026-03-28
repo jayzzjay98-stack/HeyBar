@@ -9,6 +9,7 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
     case nightShift
     case hideDock
     case hideBar
+    case showDesktop
 
     var id: String { rawValue }
 
@@ -30,6 +31,8 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
             return "Hide Dock"
         case .hideBar:
             return "Hide Bar"
+        case .showDesktop:
+            return "Show Desktop"
         }
     }
 
@@ -51,6 +54,8 @@ enum ShortcutAction: String, CaseIterable, Identifiable {
             return 5
         case .hideBar:
             return 6
+        case .showDesktop:
+            return 9
         }
     }
 

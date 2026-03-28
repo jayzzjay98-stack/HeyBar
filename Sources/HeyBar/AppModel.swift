@@ -25,6 +25,7 @@ final class AppModel: ObservableObject {
     let hideDock = HideDockController()
     let hideBar = HideBarController()
     let cleanKey = CleanKeyController()
+    let showDesktop = ShowDesktopController()
     lazy var shortcuts = ShortcutController { [weak self] action in
         guard let self else { return }
         Task { @MainActor in
@@ -39,6 +40,7 @@ final class AppModel: ObservableObject {
     nonisolated(unsafe) private var themeObserver: NSObjectProtocol?
     nonisolated(unsafe) private var finderObserver: NSObjectProtocol?
     nonisolated(unsafe) private var dockPrefObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var shortcutObserver: NSObjectProtocol?
 
     init() {
         selectedThemeID = ThemeCatalog.persistedThemeID() ?? ThemeCatalog.fallbackTheme.id
@@ -69,6 +71,17 @@ final class AppModel: ObservableObject {
             }
         }
 
+        // Shortcut changes from the Settings helper process — re-register from UserDefaults.
+        shortcutObserver = DistributedNotificationCenter.default().addObserver(
+            forName: ShortcutController.didChangeNotification,
+            object: Bundle.main.bundleIdentifier,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.shortcuts.reloadFromDefaults()
+            }
+        }
+
         // Dock preference change covers both Hide Dock and Hide Bar (menu bar autohide).
         dockPrefObserver = DistributedNotificationCenter.default().addObserver(
             forName: NSNotification.Name("com.apple.dock.prefChanged"),
@@ -86,6 +99,7 @@ final class AppModel: ObservableObject {
         themeObserver.map { DistributedNotificationCenter.default().removeObserver($0) }
         finderObserver.map { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         dockPrefObserver.map { DistributedNotificationCenter.default().removeObserver($0) }
+        shortcutObserver.map { DistributedNotificationCenter.default().removeObserver($0) }
     }
 
     var selectedTheme: AppTheme {
@@ -128,6 +142,10 @@ final class AppModel: ObservableObject {
         hideBar.toggle()
     }
 
+    func toggleShowDesktop() {
+        showDesktop.toggle()
+    }
+
     @discardableResult
     func startCleanKey() -> Bool {
         cleanKey.startCleaning()
@@ -155,6 +173,8 @@ final class AppModel: ObservableObject {
             toggleHideDock()
         case .hideBar:
             toggleHideBar()
+        case .showDesktop:
+            toggleShowDesktop()
         }
     }
 }
