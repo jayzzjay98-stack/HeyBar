@@ -23,8 +23,7 @@ APP_PATH="$DIST_DIR/HeyBar.app"
 ZIP_PATH="$DIST_DIR/HeyBar-$VERSION.zip"
 
 # ── Find sign_update tool ───────────────────────────────────────────────────
-SPARKLE_XCFW=$(find "$ROOT_DIR/.build/artifacts" -name "Sparkle.xcframework" 2>/dev/null | head -1)
-SIGN_UPDATE=$(find "$SPARKLE_XCFW" -name "sign_update" 2>/dev/null | head -1)
+SIGN_UPDATE=$(find "$ROOT_DIR/.build/artifacts" -name "sign_update" 2>/dev/null | grep -v old_dsa | head -1)
 
 if [[ -z "$SIGN_UPDATE" ]]; then
   echo "sign_update not found. Downloading Sparkle tools..."
@@ -33,7 +32,7 @@ if [[ -z "$SIGN_UPDATE" ]]; then
   curl -L "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz" \
     -o "$TMPDIR_PATH/sparkle.tar.xz"
   tar -xf "$TMPDIR_PATH/sparkle.tar.xz" -C "$TMPDIR_PATH"
-  SIGN_UPDATE=$(find "$TMPDIR_PATH" -name "sign_update" | head -1)
+  SIGN_UPDATE=$(find "$TMPDIR_PATH" -name "sign_update" | grep -v old_dsa | head -1)
 fi
 
 if [[ -z "$SIGN_UPDATE" ]]; then
