@@ -94,6 +94,14 @@ final class SettingsWindowController: NSWindowController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Renders the window invisibly so the first `present()` is instant.
+    func preWarm() {
+        guard let window else { return }
+        window.alphaValue = 0
+        centerWindowOnActiveScreen(window)
+        window.orderFront(nil)
+    }
+
     func present() {
         guard let window else { return }
         // Re-install ⌘W monitor if it was removed when the window last closed.
@@ -107,22 +115,28 @@ final class SettingsWindowController: NSWindowController {
         }
         if window.isMiniaturized {
             window.deminiaturize(nil)
-        }
-
-        if window.isVisible {
-            // Already on screen — just bring to front.
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
             return
         }
 
-        // First show: position off-screen so SwiftUI can lay out content
-        // without a visible flash, then move to the correct position.
+        if window.isVisible {
+            if window.alphaValue > 0 {
+                // Already fully visible — just bring to front.
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            } else {
+                // Pre-warmed: SwiftUI has already rendered invisibly, reveal instantly.
+                centerWindowOnActiveScreen(window)
+                window.alphaValue = 1
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
+            return
+        }
+
+        // Cold start without pre-warm: hide while SwiftUI renders, then reveal.
         window.alphaValue = 0
         centerWindowOnActiveScreen(window)
         window.orderFront(nil)
-
-        // Give SwiftUI one layout pass, then reveal.
         DispatchQueue.main.async { [weak self] in
             guard let window = self?.window else { return }
             self?.centerWindowOnActiveScreen(window)

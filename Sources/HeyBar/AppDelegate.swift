@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindowController: OnboardingWindowController?
     private var settingsHelperObserver: NSObjectProtocol?
     private var mainAppTerminationObserver: NSObjectProtocol?
+    private var settingsHelperTerminationObserver: NSObjectProtocol?
     private let isSettingsHelper =
         ProcessInfo.processInfo.environment[SettingsHelperState.environmentKey] == "1"
         || ProcessInfo.processInfo.arguments.contains("--settings-helper")
@@ -57,7 +58,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
 
-            if !isStandby {
+            if isStandby {
+                // Pre-warm: create and render the window invisibly so the first show is instant.
+                let controller = SettingsWindowController(model: model)
+                controller.onWindowClose = { [weak self] in
+                    self?.settingsWindowController = nil
+                    NSApp.terminate(nil)
+                }
+                settingsWindowController = controller
+                controller.preWarm()
+            } else {
                 showSettingsWindow()
             }
             return
@@ -71,6 +81,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.showSettings()
         })
         statusBarController?.setVisible(true)
+
+        // Pre-warm the settings helper so the first open is instant.
+        // Guard avoids double-launch if the user clicks Settings within the delay window.
+        observeSettingsHelperTermination()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            self?.prewarmSettingsHelperIfNeeded()
+        }
 
         if !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
             showOnboarding()
@@ -107,6 +124,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSWorkspace.shared.notificationCenter.removeObserver(mainAppTerminationObserver)
             self.mainAppTerminationObserver = nil
         }
+        if let settingsHelperTerminationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(settingsHelperTerminationObserver)
+            self.settingsHelperTerminationObserver = nil
+        }
         if isSettingsHelper {
             let currentPID = Int(ProcessInfo.processInfo.processIdentifier)
             if UserDefaults.standard.integer(forKey: SettingsHelperState.pidDefaultsKey) == currentPID {
@@ -133,6 +154,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             // Helper not ready yet (e.g. clicked before pre-warm finished) — launch directly.
             launchSettingsHelper(standby: false)
+        }
+    }
+
+    private func prewarmSettingsHelperIfNeeded() {
+        let pid = UserDefaults.standard.integer(forKey: SettingsHelperState.pidDefaultsKey)
+        let alreadyRunning = pid > 0
+            && pid != Int(ProcessInfo.processInfo.processIdentifier)
+            && NSRunningApplication(processIdentifier: pid_t(pid)) != nil
+        if !alreadyRunning {
+            launchSettingsHelper(standby: true)
+        }
+    }
+
+    private func observeSettingsHelperTermination() {
+        let bundleID = Bundle.main.bundleIdentifier
+        settingsHelperTerminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.bundleIdentifier == bundleID,
+                  app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+            // Re-launch a standby helper after close, so the next open is instant again.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.prewarmSettingsHelperIfNeeded()
+            }
         }
     }
 
