@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.3] - 2026-04-24
+
+### Added
+- preferences: add more playful menu bar icon choices, including Heart, Star, Moon, Cloud, Leaf, Smile, Gift, and Sun.
+
+### Changed
+- preferences: make the menu bar icon picker horizontally scrollable for easier browsing.
+- status-bar: keep all menu bar icon styles in a fixed-width slot with smaller, lighter symbols.
+
 ## [v1.2.2] - 2026-04-24
 
 ### Fixed
