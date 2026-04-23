@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.4] - 2026-04-24
+
+### Changed
+- preferences: replace the horizontal menu bar icon scroller with a dropdown menu for easier selection.
+
+### Fixed
+- updater: terminate the old HeyBar menu bar process before replacing and reopening the app bundle, so future updates launch the new binary immediately.
+
 ## [v1.2.3] - 2026-04-24
 
 ### Added
