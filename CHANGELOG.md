@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.1] - 2026-04-24
+
+### Added
+- preferences: add selectable menu bar icon styles for Bar, Menu Bar, Spark, Bolt, and Dots.
+
+### Changed
+- status-bar: keep the selected menu bar icon in sync immediately after changing it in Settings.
+
 ## [v1.1.2] - 2026-03-23
 
 ### Fixed
