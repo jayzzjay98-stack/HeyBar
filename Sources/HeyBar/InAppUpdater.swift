@@ -128,10 +128,16 @@ final class InAppUpdater: ObservableObject {
 
         let installPath = Bundle.main.bundleURL.path
         let newPath = newAppURL.path
+        let executableName = Bundle.main.executableURL?.lastPathComponent ?? "HeyBar"
 
         let script = """
         #!/bin/bash
         sleep 1.5
+        /usr/bin/pkill -x \(shellEscape(executableName)) 2>/dev/null
+        for _ in {1..50}; do
+          /usr/bin/pgrep -x \(shellEscape(executableName)) >/dev/null 2>&1 || break
+          sleep 0.1
+        done
         # Reset the TCC accessibility entry so the new binary is not rejected
         # by a stale code-signature from the previous installation.
         /usr/bin/tccutil reset Accessibility com.gravity.heybar 2>/dev/null

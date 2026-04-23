@@ -78,21 +78,52 @@ struct PreferencesSettingsPage: View {
 private struct MenuBarIconStylePicker: View {
     let selection: MenuBarIconStyle
     let onSelect: (MenuBarIconStyle) -> Void
+    @Environment(\.heyBarTheme) private var theme
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+        Menu {
+            Picker("Menu Bar Icon", selection: Binding(
+                get: { selection },
+                set: { onSelect($0) }
+            )) {
                 ForEach(MenuBarIconStyle.allCases) { style in
-                    MenuBarIconStyleButton(
-                        style: style,
-                        isSelected: selection == style
-                    ) {
-                        onSelect(style)
-                    }
+                    Label(style.title, systemImage: style.previewSymbolName)
+                        .tag(style)
                 }
             }
-            .padding(.vertical, 1)
+        } label: {
+            HStack(spacing: 12) {
+                MenuBarIconPreview(style: selection, size: .large)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(selection.title)
+                        .font(Font(theme.settingsBodyFont).weight(.semibold))
+                        .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
+                    Text("Click to choose another icon")
+                        .font(Font(theme.settingsBodyFont))
+                        .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
+                }
+
+                Spacer(minLength: 12)
+
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(nsColor: theme.settingsChromeSurfaceColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color(nsColor: theme.settingsSidebarBorderColor).opacity(0.9), lineWidth: 1)
+                    )
+            )
         }
+        .menuStyle(.button)
+        .help("Choose the HeyBar menu bar icon")
     }
 }
 
@@ -149,15 +180,7 @@ private struct MenuBarIconStyleButton: View {
 
     @ViewBuilder
     private var iconPreview: some View {
-        if style == .bar {
-            Text("|")
-                .font(.system(size: 17, weight: .light))
-                .foregroundStyle(iconColor)
-        } else {
-            Image(systemName: style.previewSymbolName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(iconColor)
-        }
+        MenuBarIconPreview(style: style, size: .compact, color: iconColor)
     }
 
     private var backgroundColor: Color {
@@ -197,6 +220,77 @@ private struct MenuBarIconStyleButton: View {
         isSelected
             ? Color(nsColor: theme.settingsPrimaryTextColor)
             : Color(nsColor: theme.settingsSecondaryTextColor)
+    }
+}
+
+private struct MenuBarIconPreview: View {
+    enum Size {
+        case compact
+        case large
+    }
+
+    let style: MenuBarIconStyle
+    let size: Size
+    var color: Color?
+    @Environment(\.heyBarTheme) private var theme
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: theme.settingsSectionSurfaceColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color(nsColor: theme.settingsSidebarBorderColor).opacity(0.7), lineWidth: 1)
+                )
+
+            icon
+        }
+        .frame(width: frameWidth, height: frameHeight)
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        if style == .bar {
+            Text("|")
+                .font(.system(size: barPointSize, weight: .light))
+                .foregroundStyle(foregroundColor)
+        } else {
+            Image(systemName: style.previewSymbolName)
+                .font(.system(size: iconPointSize, weight: .regular))
+                .foregroundStyle(foregroundColor)
+        }
+    }
+
+    private var frameWidth: CGFloat {
+        switch size {
+        case .compact: return 36
+        case .large:   return 40
+        }
+    }
+
+    private var frameHeight: CGFloat {
+        switch size {
+        case .compact: return 26
+        case .large:   return 30
+        }
+    }
+
+    private var iconPointSize: CGFloat {
+        switch size {
+        case .compact: return 13
+        case .large:   return 14
+        }
+    }
+
+    private var barPointSize: CGFloat {
+        switch size {
+        case .compact: return 17
+        case .large:   return 18
+        }
+    }
+
+    private var foregroundColor: Color {
+        color ?? Color(nsColor: theme.settingsTint)
     }
 }
 
