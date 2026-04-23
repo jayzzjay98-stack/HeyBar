@@ -30,12 +30,19 @@ final class StatusBarController {
 
         iconStyleObserver = DistributedNotificationCenter.default().addObserver(
             forName: MenuBarIconStyle.didChangeNotification,
-            object: Bundle.main.bundleIdentifier,
+            object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            let rawStyle = notification.userInfo?[MenuBarIconStyle.notificationStyleKey] as? String
             Task { @MainActor [weak self] in
-                self?.iconStyle = self?.iconStyleStore.load() ?? .bar
-                self?.updateStatusBarIcon()
+                guard let self else { return }
+                if let rawValue = rawStyle,
+                   let style = MenuBarIconStyle(rawValue: rawValue) {
+                    iconStyle = style
+                } else {
+                    iconStyle = iconStyleStore.load()
+                }
+                updateStatusBarIcon()
             }
         }
 

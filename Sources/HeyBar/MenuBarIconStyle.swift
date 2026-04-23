@@ -9,6 +9,7 @@ enum MenuBarIconStyle: String, CaseIterable, Identifiable {
 
     static let storageKey = "heybar.menuBarIconStyle"
     static let didChangeNotification = Notification.Name("com.gravity.heybar.menuBarIconStyleDidChange")
+    static let notificationStyleKey = "style"
 
     var id: String { rawValue }
 
@@ -57,6 +58,7 @@ struct MenuBarIconStyleStore {
     }
 
     func load() -> MenuBarIconStyle {
+        defaults.synchronize()
         guard let rawValue = defaults.string(forKey: key),
               let style = MenuBarIconStyle(rawValue: rawValue)
         else { return .bar }
@@ -65,10 +67,11 @@ struct MenuBarIconStyleStore {
 
     func save(_ style: MenuBarIconStyle) {
         defaults.set(style.rawValue, forKey: key)
+        defaults.synchronize()
         DistributedNotificationCenter.default().postNotificationName(
             MenuBarIconStyle.didChangeNotification,
-            object: Bundle.main.bundleIdentifier,
-            userInfo: nil,
+            object: nil,
+            userInfo: [MenuBarIconStyle.notificationStyleKey: style.rawValue],
             deliverImmediately: true
         )
     }
