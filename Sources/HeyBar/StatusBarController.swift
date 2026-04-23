@@ -6,21 +6,38 @@ final class StatusBarController {
     private let mainItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let quickPanel: QuickControlsPanelController
     private let hiddenModeStore: StatusBarHiddenModeStore
+    private let iconStyleStore = MenuBarIconStyleStore()
+    private var iconStyle: MenuBarIconStyle
     private var isHidden = false
+    private var keepAwakeOn = false
     private var eventMonitor: Any?
+    private var iconStyleObserver: NSObjectProtocol?
     private var cancellables = Set<AnyCancellable>()
 
     init(model: AppModel, settingsHandler: @escaping () -> Void) {
         hiddenModeStore = StatusBarHiddenModeStore()
+        iconStyle = iconStyleStore.load()
         quickPanel = QuickControlsPanelController(model: model, openSettings: settingsHandler)
         configureButton()
 
         model.keepAwake.$isEnabled
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isEnabled in
-                self?.updateStatusBarIcon(keepAwakeOn: isEnabled)
+                self?.keepAwakeOn = isEnabled
+                self?.updateStatusBarIcon()
             }
             .store(in: &cancellables)
+
+        iconStyleObserver = DistributedNotificationCenter.default().addObserver(
+            forName: MenuBarIconStyle.didChangeNotification,
+            object: Bundle.main.bundleIdentifier,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.iconStyle = self?.iconStyleStore.load() ?? .bar
+                self?.updateStatusBarIcon()
+            }
+        }
 
         let wasHidden = hiddenModeStore.load()
         if wasHidden { setHiddenMode(true) }
@@ -30,6 +47,10 @@ final class StatusBarController {
 
     func invalidate() {
         cancellables.removeAll()
+        if let iconStyleObserver {
+            DistributedNotificationCenter.default().removeObserver(iconStyleObserver)
+            self.iconStyleObserver = nil
+        }
         quickPanel.close()
         stopMonitor()
         NSStatusBar.system.removeStatusItem(mainItem)
@@ -73,25 +94,36 @@ final class StatusBarController {
 
     private func configureButton() {
         guard let button = mainItem.button else { return }
-        button.attributedTitle = NSAttributedString(
-            string: "|",
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 12, weight: .light),
-                .foregroundColor: NSColor.labelColor
-            ]
-        )
+        applyIconStyle(to: button)
         button.target = self
         button.action = #selector(handleClick)
         button.sendAction(on: [.leftMouseUp, .rightMouseUp, .otherMouseUp])
     }
 
-    private func updateStatusBarIcon(keepAwakeOn: Bool) {
+    private func updateStatusBarIcon() {
         guard let button = mainItem.button else { return }
         if keepAwakeOn {
             let img = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "HeyBar — Keep Awake Active")
             img?.isTemplate = true
             button.image = img
             button.imageScaling = .scaleProportionallyDown
+            button.symbolConfiguration = .init(pointSize: 13, weight: .semibold)
+            button.attributedTitle = NSAttributedString(string: "")
+        } else {
+            applyIconStyle(to: button)
+        }
+    }
+
+    private func applyIconStyle(to button: NSStatusBarButton) {
+        if let symbolName = iconStyle.statusSymbolName {
+            let image = NSImage(
+                systemSymbolName: symbolName,
+                accessibilityDescription: iconStyle.accessibilityDescription
+            )
+            image?.isTemplate = true
+            button.image = image
+            button.imageScaling = .scaleProportionallyDown
+            button.symbolConfiguration = .init(pointSize: 13, weight: .semibold)
             button.attributedTitle = NSAttributedString(string: "")
         } else {
             button.image = nil

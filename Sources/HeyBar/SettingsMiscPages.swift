@@ -19,10 +19,25 @@ private enum AppInfo {
 struct PreferencesSettingsPage: View {
     @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var launchAtLoginError: String?
+    @State private var menuBarIconStyle = MenuBarIconStyleStore().load()
+    private let iconStyleStore = MenuBarIconStyleStore()
 
     var body: some View {
         SettingsPageScroll {
             SettingsPageHeader(page: .preferences, statusText: launchAtLogin ? "Enabled" : "Disabled")
+
+            SettingsSectionCard(
+                title: "Menu Bar Icon",
+                subtitle: "Choose the HeyBar icon that sits in the macOS menu bar.",
+                statusText: menuBarIconStyle.title,
+                tone: .neutral,
+                iconName: "menubar.rectangle"
+            ) {
+                MenuBarIconStylePicker(selection: menuBarIconStyle) { style in
+                    menuBarIconStyle = style
+                    iconStyleStore.save(style)
+                }
+            }
 
             // MARK: Launch at Login
             SettingsSectionCard(
@@ -57,6 +72,132 @@ struct PreferencesSettingsPage: View {
         } catch {
             launchAtLoginError = "Could not \(enabled ? "enable" : "disable") Launch at Login. \(error.localizedDescription)"
         }
+    }
+}
+
+private struct MenuBarIconStylePicker: View {
+    let selection: MenuBarIconStyle
+    let onSelect: (MenuBarIconStyle) -> Void
+
+    private let columns = [
+        GridItem(.adaptive(minimum: 92), spacing: 10, alignment: .leading)
+    ]
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+            ForEach(MenuBarIconStyle.allCases) { style in
+                MenuBarIconStyleButton(
+                    style: style,
+                    isSelected: selection == style
+                ) {
+                    onSelect(style)
+                }
+            }
+        }
+    }
+}
+
+private struct MenuBarIconStyleButton: View {
+    let style: MenuBarIconStyle
+    let isSelected: Bool
+    let action: () -> Void
+    @Environment(\.heyBarTheme) private var theme
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(iconBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(iconBorderColor, lineWidth: 1)
+                        )
+
+                    iconPreview
+                }
+                .frame(width: 36, height: 26)
+
+                Text(style.title)
+                    .font(Font(theme.settingsBodyFont).weight(.semibold))
+                    .foregroundStyle(titleColor)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
+            .frame(minHeight: 72)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(backgroundColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(borderColor, lineWidth: 1)
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help("Use \(style.title) as the HeyBar menu bar icon")
+        .accessibilityLabel(style.title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .onHover { hovered in
+            isHovered = hovered
+        }
+    }
+
+    @ViewBuilder
+    private var iconPreview: some View {
+        if style == .bar {
+            Text("|")
+                .font(.system(size: 17, weight: .light))
+                .foregroundStyle(iconColor)
+        } else {
+            Image(systemName: style.previewSymbolName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(iconColor)
+        }
+    }
+
+    private var backgroundColor: Color {
+        if isSelected {
+            return Color(nsColor: theme.settingsTint).opacity(theme.preferredColorScheme == .dark ? 0.18 : 0.1)
+        }
+        return isHovered
+            ? Color(nsColor: theme.settingsInteractiveHoverFill)
+            : Color(nsColor: theme.settingsChromeSurfaceColor)
+    }
+
+    private var borderColor: Color {
+        isSelected
+            ? Color(nsColor: theme.settingsTint).opacity(0.42)
+            : Color(nsColor: theme.settingsSidebarBorderColor).opacity(isHovered ? 0.9 : 0.68)
+    }
+
+    private var iconBackground: Color {
+        isSelected
+            ? Color(nsColor: theme.settingsTint).opacity(theme.preferredColorScheme == .dark ? 0.22 : 0.13)
+            : Color(nsColor: theme.settingsSectionSurfaceColor)
+    }
+
+    private var iconBorderColor: Color {
+        isSelected
+            ? Color(nsColor: theme.settingsTint).opacity(0.18)
+            : Color(nsColor: theme.settingsSidebarBorderColor).opacity(0.7)
+    }
+
+    private var iconColor: Color {
+        isSelected
+            ? Color(nsColor: theme.settingsTint)
+            : Color(nsColor: theme.settingsPrimaryTextColor).opacity(0.78)
+    }
+
+    private var titleColor: Color {
+        isSelected
+            ? Color(nsColor: theme.settingsPrimaryTextColor)
+            : Color(nsColor: theme.settingsSecondaryTextColor)
     }
 }
 

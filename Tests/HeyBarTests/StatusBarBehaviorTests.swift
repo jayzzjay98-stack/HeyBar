@@ -66,4 +66,24 @@ final class StatusBarBehaviorTests: XCTestCase {
 
         XCTAssertTrue(store.load())
     }
+
+    func testMenuBarIconStyleStoreDefaultsToBar() {
+        let suiteName = "StatusBarBehaviorTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let store = MenuBarIconStyleStore(defaults: defaults, key: "statusBar.icon")
+
+        XCTAssertEqual(store.load(), .bar)
+    }
+
+    func testMenuBarIconStyleStorePersistsValue() {
+        let suiteName = "StatusBarBehaviorTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let store = MenuBarIconStyleStore(defaults: defaults, key: "statusBar.icon")
+
+        store.save(.spark)
+
+        XCTAssertEqual(store.load(), .spark)
+    }
 }
