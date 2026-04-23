@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.2] - 2026-04-24
+
+### Fixed
+- status-bar: apply menu bar icon changes immediately from Settings by sending the selected style directly across processes.
+
 ## [v1.2.1] - 2026-04-24
 
 ### Added
