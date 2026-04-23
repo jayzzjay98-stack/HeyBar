@@ -3,7 +3,14 @@ import Combine
 
 @MainActor
 final class StatusBarController {
-    private let mainItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    private enum Layout {
+        static let normalItemLength: CGFloat = 18
+        static let iconPointSize: CGFloat = 11
+        static let activeIconPointSize: CGFloat = 11
+        static let barPointSize: CGFloat = 12
+    }
+
+    private let mainItem = NSStatusBar.system.statusItem(withLength: Layout.normalItemLength)
     private let quickPanel: QuickControlsPanelController
     private let hiddenModeStore: StatusBarHiddenModeStore
     private let iconStyleStore = MenuBarIconStyleStore()
@@ -74,7 +81,7 @@ final class StatusBarController {
 
     func setHiddenMode(_ enabled: Bool) {
         isHidden = enabled
-        mainItem.length = enabled ? 10_000 : NSStatusItem.variableLength
+        mainItem.length = enabled ? 10_000 : Layout.normalItemLength
         hiddenModeStore.save(enabled)
         enabled ? startMonitor() : stopMonitor()
         HeyBarDiagnostics.debug(HeyBarLog.app, "Hidden mode set to \(enabled)")
@@ -101,6 +108,8 @@ final class StatusBarController {
 
     private func configureButton() {
         guard let button = mainItem.button else { return }
+        mainItem.length = isHidden ? 10_000 : Layout.normalItemLength
+        button.alignment = .center
         applyIconStyle(to: button)
         button.target = self
         button.action = #selector(handleClick)
@@ -113,8 +122,9 @@ final class StatusBarController {
             let img = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "HeyBar — Keep Awake Active")
             img?.isTemplate = true
             button.image = img
+            button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
-            button.symbolConfiguration = .init(pointSize: 13, weight: .semibold)
+            button.symbolConfiguration = .init(pointSize: Layout.activeIconPointSize, weight: .regular)
             button.attributedTitle = NSAttributedString(string: "")
         } else {
             applyIconStyle(to: button)
@@ -123,25 +133,34 @@ final class StatusBarController {
 
     private func applyIconStyle(to button: NSStatusBarButton) {
         if let symbolName = iconStyle.statusSymbolName {
-            let image = NSImage(
+            guard let image = NSImage(
                 systemSymbolName: symbolName,
                 accessibilityDescription: iconStyle.accessibilityDescription
-            )
-            image?.isTemplate = true
+            ) else {
+                applyBarIcon(to: button)
+                return
+            }
+            image.isTemplate = true
             button.image = image
+            button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
-            button.symbolConfiguration = .init(pointSize: 13, weight: .semibold)
+            button.symbolConfiguration = .init(pointSize: Layout.iconPointSize, weight: .regular)
             button.attributedTitle = NSAttributedString(string: "")
         } else {
-            button.image = nil
-            button.attributedTitle = NSAttributedString(
-                string: "|",
-                attributes: [
-                    .font: NSFont.systemFont(ofSize: 12, weight: .light),
-                    .foregroundColor: NSColor.labelColor
-                ]
-            )
+            applyBarIcon(to: button)
         }
+    }
+
+    private func applyBarIcon(to button: NSStatusBarButton) {
+        button.image = nil
+        button.imagePosition = .noImage
+        button.attributedTitle = NSAttributedString(
+            string: "|",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: Layout.barPointSize, weight: .light),
+                .foregroundColor: NSColor.labelColor
+            ]
+        )
     }
 
     private func showOnboardingIfNeeded() {

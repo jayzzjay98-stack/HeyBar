@@ -79,20 +79,19 @@ private struct MenuBarIconStylePicker: View {
     let selection: MenuBarIconStyle
     let onSelect: (MenuBarIconStyle) -> Void
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 92), spacing: 10, alignment: .leading)
-    ]
-
     var body: some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
-            ForEach(MenuBarIconStyle.allCases) { style in
-                MenuBarIconStyleButton(
-                    style: style,
-                    isSelected: selection == style
-                ) {
-                    onSelect(style)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(MenuBarIconStyle.allCases) { style in
+                    MenuBarIconStyleButton(
+                        style: style,
+                        isSelected: selection == style
+                    ) {
+                        onSelect(style)
+                    }
                 }
             }
+            .padding(.vertical, 1)
         }
     }
 }
@@ -127,8 +126,8 @@ private struct MenuBarIconStyleButton: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
+            .frame(width: 86)
             .frame(minHeight: 72)
-            .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(backgroundColor)

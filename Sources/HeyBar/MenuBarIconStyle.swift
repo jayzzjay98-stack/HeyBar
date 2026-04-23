@@ -6,6 +6,14 @@ enum MenuBarIconStyle: String, CaseIterable, Identifiable {
     case spark
     case bolt
     case dots
+    case heart
+    case star
+    case moon
+    case cloud
+    case leaf
+    case smile
+    case gift
+    case sun
 
     static let storageKey = "heybar.menuBarIconStyle"
     static let didChangeNotification = Notification.Name("com.gravity.heybar.menuBarIconStyleDidChange")
@@ -20,26 +28,50 @@ enum MenuBarIconStyle: String, CaseIterable, Identifiable {
         case .spark:   return "Spark"
         case .bolt:    return "Bolt"
         case .dots:    return "Dots"
+        case .heart:   return "Heart"
+        case .star:    return "Star"
+        case .moon:    return "Moon"
+        case .cloud:   return "Cloud"
+        case .leaf:    return "Leaf"
+        case .smile:   return "Smile"
+        case .gift:    return "Gift"
+        case .sun:     return "Sun"
         }
     }
 
     var previewSymbolName: String {
         switch self {
         case .bar:     return "line.diagonal"
-        case .menuBar: return "menubar.rectangle"
-        case .spark:   return "sparkles"
+        case .menuBar: return "rectangle.topthird.inset.filled"
+        case .spark:   return "sparkle"
         case .bolt:    return "bolt"
         case .dots:    return "ellipsis"
+        case .heart:   return "heart"
+        case .star:    return "star"
+        case .moon:    return "moon"
+        case .cloud:   return "cloud"
+        case .leaf:    return "leaf"
+        case .smile:   return "face.smiling"
+        case .gift:    return "gift"
+        case .sun:     return "sun.max"
         }
     }
 
     var statusSymbolName: String? {
         switch self {
         case .bar:     return nil
-        case .menuBar: return "menubar.rectangle"
-        case .spark:   return "sparkles"
+        case .menuBar: return "rectangle.topthird.inset.filled"
+        case .spark:   return "sparkle"
         case .bolt:    return "bolt"
         case .dots:    return "ellipsis"
+        case .heart:   return "heart"
+        case .star:    return "star"
+        case .moon:    return "moon"
+        case .cloud:   return "cloud"
+        case .leaf:    return "leaf"
+        case .smile:   return "face.smiling"
+        case .gift:    return "gift"
+        case .sun:     return "sun.max"
         }
     }
 
