@@ -3,6 +3,9 @@ import AppKit
 
 @MainActor
 final class InAppUpdater: ObservableObject {
+    nonisolated static let installRequestNotification = Notification.Name("com.gravity.heybar.installUpdateRequest")
+    nonisolated static let installRequestVersionKey = "version"
+    nonisolated static let installRequestZipPathKey = "zipPath"
 
     enum State {
         case idle
@@ -62,6 +65,14 @@ final class InAppUpdater: ObservableObject {
     }
 
     func installDownloaded(version: String, zipURL: URL) {
+        if requestInstallFromMainAppIfNeeded(version: version, zipURL: zipURL) {
+            state = .installing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                NSApp.terminate(nil)
+            }
+            return
+        }
+
         state = .installing
         Task {
             do {
@@ -72,7 +83,33 @@ final class InAppUpdater: ObservableObject {
         }
     }
 
+    nonisolated static func installRequest(from userInfo: [AnyHashable: Any]?) -> (version: String, zipURL: URL)? {
+        guard let userInfo,
+              let version = userInfo[installRequestVersionKey] as? String,
+              let zipPath = userInfo[installRequestZipPathKey] as? String
+        else { return nil }
+        return (version, URL(fileURLWithPath: zipPath))
+    }
+
     // MARK: - Private
+
+    private func requestInstallFromMainAppIfNeeded(version: String, zipURL: URL) -> Bool {
+        let isSettingsHelper =
+            ProcessInfo.processInfo.environment["HEYBAR_SETTINGS_HELPER"] == "1"
+            || ProcessInfo.processInfo.arguments.contains("--settings-helper")
+        guard isSettingsHelper else { return false }
+
+        DistributedNotificationCenter.default().postNotificationName(
+            Self.installRequestNotification,
+            object: nil,
+            userInfo: [
+                Self.installRequestVersionKey: version,
+                Self.installRequestZipPathKey: zipURL.path
+            ],
+            deliverImmediately: true
+        )
+        return true
+    }
 
     private func fetchLatestRelease() async throws -> (version: String, downloadURL: String) {
         var request = URLRequest(url: apiURL)

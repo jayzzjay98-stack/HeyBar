@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsHelperObserver: NSObjectProtocol?
     private var mainAppTerminationObserver: NSObjectProtocol?
     private var settingsHelperTerminationObserver: NSObjectProtocol?
+    private var updateInstallObserver: NSObjectProtocol?
     private let isSettingsHelper =
         ProcessInfo.processInfo.environment[SettingsHelperState.environmentKey] == "1"
         || ProcessInfo.processInfo.arguments.contains("--settings-helper")
@@ -76,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         _ = model.shortcuts
+        observeUpdateInstallRequests()
 
         statusBarController = StatusBarController(model: model, settingsHandler: { [weak self] in
             self?.showSettings()
@@ -127,6 +129,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let settingsHelperTerminationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(settingsHelperTerminationObserver)
             self.settingsHelperTerminationObserver = nil
+        }
+        if let updateInstallObserver {
+            DistributedNotificationCenter.default().removeObserver(updateInstallObserver)
+            self.updateInstallObserver = nil
         }
         if isSettingsHelper {
             let currentPID = Int(ProcessInfo.processInfo.processIdentifier)
@@ -180,6 +186,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Re-launch a standby helper after close, so the next open is instant again.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.prewarmSettingsHelperIfNeeded()
+            }
+        }
+    }
+
+    private func observeUpdateInstallRequests() {
+        updateInstallObserver = DistributedNotificationCenter.default().addObserver(
+            forName: InAppUpdater.installRequestNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let userInfo = notification.userInfo
+            guard let self,
+                  let request = InAppUpdater.installRequest(from: userInfo)
+            else { return }
+
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.model.updater.installDownloaded(version: request.version, zipURL: request.zipURL)
             }
         }
     }
