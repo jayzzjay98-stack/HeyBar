@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.8] - 2026-04-24
+
+### Changed
+- preferences: keep the menu bar icon chooser expanded after selecting an icon so multiple icons can be previewed more quickly.
+
 ## [v1.2.7] - 2026-04-24
 
 ### Fixed
