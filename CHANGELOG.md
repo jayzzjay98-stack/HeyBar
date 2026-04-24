@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.5] - 2026-04-24
+
+### Changed
+- preferences: replace the nested menu-bar icon menu with a single-click inline chooser that expands directly inside Settings.
+
+### Fixed
+- updater: use a staged app replacement flow with `ditto` and `open -n` so the relaunched app comes from the newly installed bundle more reliably.
+
 ## [v1.2.4] - 2026-04-24
 
 ### Changed
