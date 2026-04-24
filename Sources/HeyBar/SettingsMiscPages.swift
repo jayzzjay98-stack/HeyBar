@@ -39,7 +39,6 @@ struct PreferencesSettingsPage: View {
                     isExpanded: iconChooserExpanded
                 ) { style in
                     menuBarIconStyle = style
-                    iconChooserExpanded = false
                     iconStyleStore.save(style)
                 } onToggleExpanded: {
                     withAnimation(.easeInOut(duration: 0.16)) {
