@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.6] - 2026-04-24
+
+### Fixed
+- updater: relaunch the newly installed menu bar app by starting the app executable directly with the helper environment removed, so HeyBar comes back in the menu bar instead of failing to relaunch cleanly.
+
 ## [v1.2.5] - 2026-04-24
 
 ### Changed
