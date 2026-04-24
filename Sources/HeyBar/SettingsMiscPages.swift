@@ -20,6 +20,7 @@ struct PreferencesSettingsPage: View {
     @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var launchAtLoginError: String?
     @State private var menuBarIconStyle = MenuBarIconStyleStore().load()
+    @State private var iconChooserExpanded = false
     private let iconStyleStore = MenuBarIconStyleStore()
 
     var body: some View {
@@ -33,9 +34,17 @@ struct PreferencesSettingsPage: View {
                 tone: .neutral,
                 iconName: "menubar.rectangle"
             ) {
-                MenuBarIconStylePicker(selection: menuBarIconStyle) { style in
+                MenuBarIconStylePicker(
+                    selection: menuBarIconStyle,
+                    isExpanded: iconChooserExpanded
+                ) { style in
                     menuBarIconStyle = style
+                    iconChooserExpanded = false
                     iconStyleStore.save(style)
+                } onToggleExpanded: {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        iconChooserExpanded.toggle()
+                    }
                 }
             }
 
@@ -77,53 +86,74 @@ struct PreferencesSettingsPage: View {
 
 private struct MenuBarIconStylePicker: View {
     let selection: MenuBarIconStyle
+    let isExpanded: Bool
     let onSelect: (MenuBarIconStyle) -> Void
+    let onToggleExpanded: () -> Void
     @Environment(\.heyBarTheme) private var theme
 
+    private let columns = [
+        GridItem(.adaptive(minimum: 88, maximum: 88), spacing: 10, alignment: .top)
+    ]
+
     var body: some View {
-        Menu {
-            Picker("Menu Bar Icon", selection: Binding(
-                get: { selection },
-                set: { onSelect($0) }
-            )) {
-                ForEach(MenuBarIconStyle.allCases) { style in
-                    Label(style.title, systemImage: style.previewSymbolName)
-                        .tag(style)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: onToggleExpanded) {
+                pickerLabel
             }
-        } label: {
-            HStack(spacing: 12) {
-                MenuBarIconPreview(style: selection, size: .large)
+            .buttonStyle(.plain)
+            .help("Choose the HeyBar menu bar icon")
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(selection.title)
-                        .font(Font(theme.settingsBodyFont).weight(.semibold))
-                        .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
-                    Text("Click to choose another icon")
-                        .font(Font(theme.settingsBodyFont))
-                        .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
+            if isExpanded {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+                    ForEach(MenuBarIconStyle.allCases) { style in
+                        MenuBarIconStyleButton(
+                            style: style,
+                            isSelected: selection == style
+                        ) {
+                            onSelect(style)
+                        }
+                    }
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
 
-                Spacer(minLength: 12)
+    private var pickerLabel: some View {
+        HStack(spacing: 12) {
+            MenuBarIconPreview(style: selection, size: .large)
 
-                Image(systemName: "chevron.up.chevron.down")
+            VStack(alignment: .leading, spacing: 3) {
+                Text(selection.title)
+                    .font(Font(theme.settingsBodyFont).weight(.semibold))
+                    .foregroundStyle(Color(nsColor: theme.settingsPrimaryTextColor))
+                Text(isExpanded ? "Choose an icon below" : "Click once to show all icons")
+                    .font(Font(theme.settingsBodyFont))
+                    .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
+            }
+
+            Spacer(minLength: 12)
+
+            HStack(spacing: 12) {
+                Text("\(MenuBarIconStyle.allCases.count)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color(nsColor: theme.settingsSecondaryTextColor))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(nsColor: theme.settingsChromeSurfaceColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color(nsColor: theme.settingsSidebarBorderColor).opacity(0.9), lineWidth: 1)
-                    )
-            )
         }
-        .menuStyle(.button)
-        .help("Choose the HeyBar menu bar icon")
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: theme.settingsChromeSurfaceColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color(nsColor: theme.settingsSidebarBorderColor).opacity(0.9), lineWidth: 1)
+                )
+        )
     }
 }
 

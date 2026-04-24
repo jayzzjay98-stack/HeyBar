@@ -129,11 +129,14 @@ final class InAppUpdater: ObservableObject {
         let installPath = Bundle.main.bundleURL.path
         let newPath = newAppURL.path
         let executableName = Bundle.main.executableURL?.lastPathComponent ?? "HeyBar"
+        let stagedInstallPath = "\(installPath).updating"
+        let backupInstallPath = "\(installPath).previous"
 
         let script = """
         #!/bin/bash
         sleep 1.5
         /usr/bin/pkill -x \(shellEscape(executableName)) 2>/dev/null
+        /usr/bin/pkill -f \(shellEscape("/\(executableName).app/Contents/MacOS/\(executableName)")) 2>/dev/null
         for _ in {1..50}; do
           /usr/bin/pgrep -x \(shellEscape(executableName)) >/dev/null 2>&1 || break
           sleep 0.1
@@ -141,10 +144,16 @@ final class InAppUpdater: ObservableObject {
         # Reset the TCC accessibility entry so the new binary is not rejected
         # by a stale code-signature from the previous installation.
         /usr/bin/tccutil reset Accessibility com.gravity.heybar 2>/dev/null
-        rm -rf \(shellEscape(installPath))
-        cp -R \(shellEscape(newPath)) \(shellEscape(installPath))
+        rm -rf \(shellEscape(stagedInstallPath))
+        rm -rf \(shellEscape(backupInstallPath))
+        /usr/bin/ditto \(shellEscape(newPath)) \(shellEscape(stagedInstallPath))
+        if [[ -d \(shellEscape(installPath)) ]]; then
+          mv \(shellEscape(installPath)) \(shellEscape(backupInstallPath))
+        fi
+        mv \(shellEscape(stagedInstallPath)) \(shellEscape(installPath))
+        rm -rf \(shellEscape(backupInstallPath))
         /usr/bin/codesign --force --deep --sign - \(shellEscape(installPath)) 2>/dev/null
-        open \(shellEscape(installPath))
+        open -n \(shellEscape(installPath))
         """
 
         let scriptPath = workDir.appendingPathComponent("replace.sh").path
