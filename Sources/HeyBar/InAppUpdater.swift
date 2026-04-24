@@ -129,6 +129,7 @@ final class InAppUpdater: ObservableObject {
         let installPath = Bundle.main.bundleURL.path
         let newPath = newAppURL.path
         let executableName = Bundle.main.executableURL?.lastPathComponent ?? "HeyBar"
+        let installedExecutablePath = "\(installPath)/Contents/MacOS/\(executableName)"
         let stagedInstallPath = "\(installPath).updating"
         let backupInstallPath = "\(installPath).previous"
 
@@ -153,7 +154,7 @@ final class InAppUpdater: ObservableObject {
         mv \(shellEscape(stagedInstallPath)) \(shellEscape(installPath))
         rm -rf \(shellEscape(backupInstallPath))
         /usr/bin/codesign --force --deep --sign - \(shellEscape(installPath)) 2>/dev/null
-        open -n \(shellEscape(installPath))
+        /usr/bin/nohup /usr/bin/env -u HEYBAR_SETTINGS_HELPER \(shellEscape(installedExecutablePath)) >/dev/null 2>&1 &
         """
 
         let scriptPath = workDir.appendingPathComponent("replace.sh").path
