@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.2.7] - 2026-04-24
+
+### Fixed
+- updater: when install is triggered from the Settings helper, delegate the install work back to the main menu bar process so HeyBar can shut down and relaunch from the correct process after updating.
+
 ## [v1.2.6] - 2026-04-24
 
 ### Fixed
